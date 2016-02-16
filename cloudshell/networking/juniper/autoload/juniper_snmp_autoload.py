@@ -1,8 +1,7 @@
 from copy import deepcopy
 import re
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
-
-from juniper import test_data
+from cloudshell.networking.juniper.examples import autoload_test_data as test_data
 from cloudshell.networking.juniper.utils import build_mib_dict
 from cloudshell.core.logger import qs_logger
 
