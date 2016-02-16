@@ -1674,3 +1674,10 @@ SYSTEM = [(0, {'sysName': 'Juniper_EX3300_2', 'sysObjectID': 'JUNIPER-CHASSIS-DE
                'suffix': '0', 'sysLocation': '', 'sysServices': '6', 'sysUpTime': '1996931027',
                'sysDescr': 'Juniper Networks, Inc. ex3300-48t internet router, kernel JUNOS 11.4R5.7 #0: 2013-01-05 12:13:42 UTC     builder@queth.juniper.net:/volume/build/junos/11.4/release/11.4R5.7/obj-arm/bsd/kernels/JUNIPER-EX-3300/kernel Build date: 2013-01-05 11:28:27 UTC Co',
                'sysContact': ''})]
+
+MIB_DATA_MAP = {'JUNIPER-MIB::jnxContainersTable': CONTAINER_TABLE,
+                'JUNIPER-MIB::jnxContentsTable': CONTENTS_TABLE,
+                'SNMPv2-MIB::system': SYSTEM,
+                'JUNIPER-IF-MIB::ifChassisTable': JUNIPER_IF_CHASSIS,
+                'IF-MIB::interfaces': INTERFACES,
+                'IP-MIB::ipAddrTable': IP_ADDR_TABLE}

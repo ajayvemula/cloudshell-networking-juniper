@@ -1,8 +1,7 @@
 from copy import deepcopy
+
 import re
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
-from cloudshell.networking.juniper.examples import autoload_test_data as test_data
-from cloudshell.networking.juniper.utils import build_mib_dict
 from cloudshell.core.logger import qs_logger
 
 ATTRIBUTE_MAPPING = {"PORT": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MAC Address', 'ifMtu': 'MTU',
@@ -104,54 +103,34 @@ class JuniperSnmpAutoload:
         self.chassis = {}
         self.index_table = {}
         self.snmp_data = {}
-        self._test_mode = False
 
     def _load_tables(self):
-        if not self._test_mode:
-            self._logger.info("Loading mibs")
-            self._snmp_handler.load_mib('JUNIPER-MIB')
-            self._snmp_handler.load_mib('JUNIPER-SMI')
-            self._snmp_handler.load_mib('JUNIPER-IF-MIB')
-            self._snmp_handler.load_mib('IF-MIB')
-            self._snmp_handler.load_mib('JUNIPER-CHASSIS-DEFINES-MIB')
-            self._snmp_handler.load_mib('IEEE8023-LAG-MIB')
+        self._logger.info("Loading mibs")
+        self._snmp_handler.load_mib('JUNIPER-MIB')
+        self._snmp_handler.load_mib('JUNIPER-SMI')
+        self._snmp_handler.load_mib('JUNIPER-IF-MIB')
+        self._snmp_handler.load_mib('IF-MIB')
+        self._snmp_handler.load_mib('JUNIPER-CHASSIS-DEFINES-MIB')
+        self._snmp_handler.load_mib('IEEE8023-LAG-MIB')
 
         self._logger.info('Start loading MIB tables:')
 
-        if self._test_mode:
-            self.snmp_data["system"] = build_mib_dict(test_data.SYSTEM, "system")
-        else:
-            self.snmp_data["system"] = self._snmp_handler.walk(('SNMPv2-MIB', 'system'))
+        self.snmp_data["system"] = self._snmp_handler.walk(('SNMPv2-MIB', 'system'))
         self._logger.info('General System information loaded')
 
-        if self._test_mode:
-            self.snmp_data["jnxContainersTable"] = build_mib_dict(test_data.CONTAINER_TABLE, "containers data")
-        else:
-            self.snmp_data["jnxContainersTable"] = self._snmp_handler.walk(('JUNIPER-MIB', 'jnxContainersTable'))
+        self.snmp_data["jnxContainersTable"] = self._snmp_handler.walk(('JUNIPER-MIB', 'jnxContainersTable'))
         self._logger.info('Containers information loaded')
 
-        if self._test_mode:
-            self.snmp_data["jnxContentsTable"] = build_mib_dict(test_data.CONTENTS_TABLE, "contents data")
-        else:
-            self.snmp_data["jnxContentsTable"] = self._snmp_handler.walk(('JUNIPER-MIB', 'jnxContentsTable'))
+        self.snmp_data["jnxContentsTable"] = self._snmp_handler.walk(('JUNIPER-MIB', 'jnxContentsTable'))
         self._logger.info('Contents information loaded')
 
-        if self._test_mode:
-            self.snmp_data["ifChassisTable"] = build_mib_dict(test_data.JUNIPER_IF_CHASSIS, "if chassis")
-        else:
-            self.snmp_data["ifChassisTable"] = self._snmp_handler.walk(('JUNIPER-IF-MIB', 'ifChassisTable'))
+        self.snmp_data["ifChassisTable"] = self._snmp_handler.walk(('JUNIPER-IF-MIB', 'ifChassisTable'))
         self._logger.info('Juniper interfaces chassis information loaded')
 
-        if self._test_mode:
-            self.snmp_data["interfaces"] = build_mib_dict(test_data.INTERFACES, "if jnx table")
-        else:
-            self.snmp_data["interfaces"] = self._snmp_handler.walk(('IF-MIB', 'interfaces'))
+        self.snmp_data["interfaces"] = self._snmp_handler.walk(('IF-MIB', 'interfaces'))
         self._logger.info('Interfaces information loaded')
 
-        if self._test_mode:
-            self.snmp_data["ipAddrTable"] = build_mib_dict(test_data.IP_ADDR_TABLE, "ip addr table")
-        else:
-            self.snmp_data["ipAddrTable"] = self._snmp_handler.walk(('IP-MIB', 'ipAddrTable'))
+        self.snmp_data["ipAddrTable"] = self._snmp_handler.walk(('IP-MIB', 'ipAddrTable'))
         self._logger.info('ip v4 address table loaded')
 
         # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
@@ -289,7 +268,7 @@ class JuniperSnmpAutoload:
         for element in [el for el in self.elements.values() if el.type in ELEMENT_DEFINITION]:
             if len(DATAMODEL_ASSOCIATION[element.type_string]) == 2:
                 name = "{0} {1}".format(DATAMODEL_ASSOCIATION[element.type_string][1],
-                                                element.relative_path.split("/")[-1])
+                                        element.relative_path.split("/")[-1])
 
             else:
                 name = element.content_description
@@ -362,7 +341,7 @@ class JuniperSnmpAutoload:
         self.build_ports_relative_path()
 
         result = "{0}${1}{2}".format(self._generate_description_string(), self._get_device_details(),
-                                   self._generate_attribute_string())
+                                     self._generate_attribute_string())
         self._logger.info('*******************************************')
         self._logger.info('Resource details:')
 
@@ -376,7 +355,11 @@ class JuniperSnmpAutoload:
 
 
 if __name__ == '__main__':
-    snmp_autoload = JuniperSnmpAutoload(None)
+    from cloudshell.networking.juniper.utils import FakeSnmpHandler
+    from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+
+    fake_smp_handler = FakeSnmpHandler(MIB_DATA_MAP)
+    snmp_autoload = JuniperSnmpAutoload(fake_smp_handler)
     print(snmp_autoload.get_inventory())
     # print(snmp_autoload._get_device_details())
 

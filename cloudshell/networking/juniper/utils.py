@@ -17,3 +17,15 @@ def build_mib_dict(data, name):
     for key, val in data:
         mib_dict[key] = val
     return mib_dict
+
+
+class FakeSnmpHandler:
+    def __init__(self, mib_data_map):
+        self._mib_data_map = mib_data_map
+
+    def walk(self, request_tuple):
+        requested_data = '{0}::{1}'.format(*request_tuple)
+        return build_mib_dict(self._mib_data_map[requested_data], requested_data)
+
+    def load_mib(self, mib):
+        pass
