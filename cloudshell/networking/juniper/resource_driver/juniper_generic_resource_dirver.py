@@ -151,7 +151,7 @@ class juniper_generic_resource_driver(networking_generic_resource_driver):
             self.handler_name = detected_platform_name
 
 
-        self._resource_handler = HandlerFactory.createHandler(self.handler_name, **handler_params)
+        self._resource_handler = HandlerFactory.create_handler(self.handler_name, **handler_params)
         self._resource_handler._logger.info('Created resource handle {0}'.format(self.handler_name.upper()))
 
         self._resource_handler.set_parameters(json_object)

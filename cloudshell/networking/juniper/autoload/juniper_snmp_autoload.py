@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import re
+import os
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
 from cloudshell.core.logger import qs_logger
 
@@ -97,7 +98,9 @@ class Port:
 class JuniperSnmpAutoload:
     def __init__(self, snmp_handler, logger=None):
         self._snmp_handler = snmp_handler
-        self._logger = logger or qs_logger.getQSLogger()
+        path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mibs'))
+        self._snmp_handler.update_mib_sources(path)
+        self._logger = logger or qs_logger.get_qs_logger()
         self.elements = {}
         self.ports = {}
         self.chassis = {}
@@ -355,11 +358,18 @@ class JuniperSnmpAutoload:
 
 
 if __name__ == '__main__':
-    from cloudshell.networking.juniper.utils import FakeSnmpHandler
-    from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+    from cloudshell.snmp.quali_snmp import QualiSnmp
 
-    fake_smp_handler = FakeSnmpHandler(MIB_DATA_MAP)
-    snmp_autoload = JuniperSnmpAutoload(fake_smp_handler)
+    ip = "192.168.28.150"
+    community = "public"
+    snmp_handler = QualiSnmp(ip, community=community)
+
+    # from cloudshell.networking.juniper.utils import FakeSnmpHandler
+    # from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+    #
+    # snmp_handler = FakeSnmpHandler(MIB_DATA_MAP)
+
+    snmp_autoload = JuniperSnmpAutoload(snmp_handler)
     print(snmp_autoload.get_inventory())
     # print(snmp_autoload._get_device_details())
 
