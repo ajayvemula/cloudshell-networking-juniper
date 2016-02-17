@@ -333,7 +333,7 @@ class JuniperSnmpAutoload:
         details_string += RESOURCE_ATTRIBUTE_TEMPLATE.format("", "Model", model)
         return details_string
 
-    def get_inventory(self):
+    def discover_snmp(self):
 
         self._load_tables()
 
@@ -370,7 +370,7 @@ if __name__ == '__main__':
     # snmp_handler = FakeSnmpHandler(MIB_DATA_MAP)
 
     snmp_autoload = JuniperSnmpAutoload(snmp_handler)
-    print(snmp_autoload.get_inventory())
+    print(snmp_autoload.discover_snmp())
     # print(snmp_autoload._get_device_details())
 
 
