@@ -358,16 +358,16 @@ class JuniperSnmpAutoload:
 
 
 if __name__ == '__main__':
-    from cloudshell.snmp.quali_snmp import QualiSnmp
-
-    ip = "192.168.28.150"
-    community = "public"
-    snmp_handler = QualiSnmp(ip, community=community)
-
-    # from cloudshell.networking.juniper.utils import FakeSnmpHandler
-    # from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+    # from cloudshell.snmp.quali_snmp import QualiSnmp
     #
-    # snmp_handler = FakeSnmpHandler(MIB_DATA_MAP)
+    # ip = "192.168.28.150"
+    # community = "public"
+    # snmp_handler = QualiSnmp(ip, community=community)
+    #
+    from cloudshell.networking.juniper.utils import FakeSnmpHandler
+    from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+
+    snmp_handler = FakeSnmpHandler(MIB_DATA_MAP)
 
     snmp_autoload = JuniperSnmpAutoload(snmp_handler)
     print(snmp_autoload.discover_snmp())
