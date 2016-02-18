@@ -10,8 +10,9 @@ ATTRIBUTE_MAPPING = {"PORT": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MA
                               "protoType": "Protocol Type", "dot3StatsDuplexStatus": "Duplex",
                               "autoNegotiation": "Auto Negotiation",
                               },
-                     "PORT_CHANNEL": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MAC Address', 'ifMtu': 'MTU',
-                                      'ifSpeed': 'Bandwidth'},
+                     "PORT_CHANNEL": {'ifPhysAddress': 'MAC Address', 'ifMtu': 'MTU',
+                                      'ifSpeed': 'Bandwidth', 'associatedPorts': 'Associated Ports',
+                                      "protoType": "Protocol Type"},
                      "CHASSIS": {"jnxContainersType": "Model", "jnxContentsSerialNo": "Serial Number"},
                      "MODULE": {"jnxContentsType": "Model", "jnxContentsRevision": "Version",
                                 "jnxContentsSerialNo": "Serial Number"},
@@ -21,8 +22,8 @@ ATTRIBUTE_MAPPING = {"PORT": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MA
                                       "jnxContentsDescr": "Port Description", "jnxContentsPartNo": "Version"},
                      }
 
-ATTRIBUTE_PERMANENT_VALUES = {"PORT": {'protoType': 'Transparent', "autoNegotiation": "True",
-                                       "dot3StatsDuplexStatus": "Full"}}
+ATTRIBUTE_PERMANENT_VALUES = {"PORT": {'protoType': 'Transparent', "autoNegotiation": "True"},
+                              "PORT_CHANNEL": {'protoType': 'Transparent', "autoNegotiation": "True"}}
 
 RESOURCE_TEMPLATE = '{0}^{1}^{2}^{3}|'
 RESOURCE_ATTRIBUTE_TEMPLATE = '{0}^{1}^{2}|'
@@ -43,7 +44,7 @@ ATTRIBUTE_DESCRIPTION = {"CHASSIS": "jnxContentsDescr", "MODULE": "jnxContainers
 ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "POWER_MODULE"}
 
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
-PORT_DEFINITION = {"ethernetCsmacd": "PORT"}
+PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT'}
 
 
 class Element:
@@ -79,7 +80,7 @@ class Element:
 
 class Port:
     ATTRIBUTES_MAP = {"pic": "ifChassisPic", "fpc": "ifChassisFpc", "logical_unit": "ifChassisLogicalUnit",
-                      "type": "ifType"}
+                      "type": "ifType", "name": "ifDescr"}
 
     def __init__(self):
         self.index = None
@@ -89,6 +90,7 @@ class Port:
         self.fpc = None
         self.logical_unit = None
         self.relative_path = None
+        self.name = None
         self.attributes = {}
 
     def __str__(self):
@@ -115,6 +117,7 @@ class JuniperSnmpAutoload:
         self._snmp_handler.load_mib('IF-MIB')
         self._snmp_handler.load_mib('JUNIPER-CHASSIS-DEFINES-MIB')
         self._snmp_handler.load_mib('IEEE8023-LAG-MIB')
+        self._snmp_handler.load_mib('EtherLike-MIB')
 
         self._logger.info('Start loading MIB tables:')
 
@@ -135,6 +138,13 @@ class JuniperSnmpAutoload:
 
         self.snmp_data["ipAddrTable"] = self._snmp_handler.walk(('IP-MIB', 'ipAddrTable'))
         self._logger.info('ip v4 address table loaded')
+
+        self.snmp_data["dot3StatsDuplexStatus"] = self._snmp_handler.walk(('EtherLike-MIB', 'dot3StatsDuplexStatus'))
+        self._logger.info("Duplex table loaded")
+
+        self.snmp_data["dot3adAggPortTable"] = self._snmp_handler.walk(
+            ('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
+        self._logger.info("Aggregation ports table loaded")
 
         # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
         # self._logger.info('ip v6 address table loaded')
@@ -227,24 +237,48 @@ class JuniperSnmpAutoload:
         ip_addr_data = sort_elements_by_attributes(self.snmp_data["ipAddrTable"], "ipAdEntIfIndex")
         juniper_if_mib_data = self.snmp_data["ifChassisTable"]
         if_mib_data = self.snmp_data["interfaces"]
-        ports = {}
+        duplex_table = self.snmp_data["dot3StatsDuplexStatus"]
+
         for index in juniper_if_mib_data:
             port = Port()
             port.index = index
             port_attributes = deepcopy(juniper_if_mib_data[index])
             port_attributes.update(if_mib_data[index])
+            if index in duplex_table:
+                port_attributes.update(duplex_table[index])
             if index in ip_addr_data:
                 port_attributes.update(ip_addr_data[index])
             self._map_attributes(port, Port.ATTRIBUTES_MAP, port_attributes)
-            if port.type.strip("'") in PORT_DEFINITION and port.logical_unit is "0":
+            if port.type.strip("'") in PORT_DEFINITION:
                 port.type_string = PORT_DEFINITION[port.type.strip("'")]
-                ports[index] = port
-        return ports
+                self.ports[index] = port
+
+    def associate_portchannels(self):
+        snmp_data = self.snmp_data['dot3adAggPortTable']
+        for port_index in snmp_data:
+            associated_phisical_port = self._get_associated_phisical_port_by_name(self.ports[int(port_index)].name)
+            logical_portchannel_index = snmp_data[port_index]['dot3adAggPortAttachedAggID']
+            associated_phisical_portchannel = self._get_associated_phisical_port_by_name(
+                self.ports[int(logical_portchannel_index)].name)
+            if associated_phisical_port and associated_phisical_portchannel:
+                if 'associatedPorts' in associated_phisical_portchannel.attributes:
+                    associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
+                        associated_phisical_portchannel.attributes['associatedPorts'],
+                        associated_phisical_port.name.replace("/", "-"))
+                else:
+                    associated_phisical_portchannel.attributes['associatedPorts'] = \
+                        associated_phisical_port.name.replace("/", "-")
+
+    def _get_associated_phisical_port_by_name(self, name):
+        for port in self.ports.values():
+            if port.name in name and port.logical_unit is '0':
+                return port
+        return None
 
     def build_ports_relative_path(self):
         self._logger.info("Generating relative path for ports")
         fpc_pic_map = self.sort_elements_by_fpc_pic()
-        for port in self.ports.values():
+        for port in [p for p in self.ports.values() if p.logical_unit is '0']:
             index = "{0}.{1}".format(port.fpc, port.pic)
             if index in fpc_pic_map:
                 parent_path = fpc_pic_map[index].relative_path
@@ -277,20 +311,19 @@ class JuniperSnmpAutoload:
                 name = element.content_description
             description_string += RESOURCE_TEMPLATE.format(DATAMODEL_ASSOCIATION[element.type_string][0],
                                                            name, element.relative_path, "")
-        for port in self.ports.values():
+        for port in [p for p in self.ports.values() if p.logical_unit is '0']:
             description_string += RESOURCE_TEMPLATE.format(DATAMODEL_ASSOCIATION[port.type_string][0],
-                                                           str(port.attributes[
-                                                                   ATTRIBUTE_DESCRIPTION[port.type_string]]).replace(
-                                                               "/", "-"),
-                                                           port.relative_path, "")
+                                                           str(port.name).replace("/", "-"), port.relative_path, "")
         return description_string
 
     def _generate_attribute_string(self):
         self._logger.info("Generate attribute string")
         attribute_string = ""
-        for element in [el for el in self.elements.values() if el.type in ELEMENT_DEFINITION] + \
-                [port for port in self.ports.values()]:
+        for element in [el for el in self.elements.values() if el.type in ELEMENT_DEFINITION]:
             attribute_string += self._get_attribute_string_for_element(element)
+
+        for port in [p for p in self.ports.values() if p.logical_unit is '0']:
+            attribute_string += self._get_attribute_string_for_element(port)
         return attribute_string
 
     def _get_attribute_string_for_element(self, element):
@@ -340,7 +373,8 @@ class JuniperSnmpAutoload:
         self._build_chassis_elements()
         self._build_elements_relative_path()
 
-        self.ports = self.build_ports()
+        self.build_ports()
+        self.associate_portchannels()
         self.build_ports_relative_path()
 
         result = "{0}${1}{2}".format(self._generate_description_string(), self._get_device_details(),
@@ -372,7 +406,7 @@ if __name__ == '__main__':
     snmp_autoload = JuniperSnmpAutoload(snmp_handler)
     print(snmp_autoload.discover_snmp())
     # print(snmp_autoload._get_device_details())
-
+    # print(snmp_autoload.ports[599].attributes)
 
     # print(snmp_autoload._generate_description_string())
 
@@ -381,7 +415,7 @@ if __name__ == '__main__':
     # print(snmp_autoload.elements)
     # snmp_autoload.add_ports_if_attributes(build_mib_dict(NTT_IF_MIB, "if attrs"), build_mib_dict(NTT_JUNIPER_IF_MIB, "if mmm"))
 
-    # print('\n'.join(map(str, [element.relative_path for element in snmp_autoload.elements.values()])))
+    # print('\n'.join(map(str, ['{0}, {1}'.format(element.relative_path, element.type_string) for element in snmp_autoload.elements.values() if element.type in ELEMENT_DEFINITION])))
     # print('\n'.join(map(str, [port.attributes["ifDescr"] for port in snmp_autoload.ports.values() if port.relative_path is None and port.logical_unit is "0"])))
     # print('\n'.join(map(str, [
     #     "{0}, {1}, {2}, {3}".format(port.attributes["ifDescr"], port.attributes["ifType"], port.relative_path,
