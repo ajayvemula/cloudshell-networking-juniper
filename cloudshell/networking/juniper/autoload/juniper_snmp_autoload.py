@@ -23,7 +23,7 @@ ATTRIBUTE_MAPPING = {"PORT": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MA
                      }
 
 ATTRIBUTE_PERMANENT_VALUES = {"PORT": {'protoType': 'Transparent', "autoNegotiation": "True"},
-                              "PORT_CHANNEL": {'protoType': 'Transparent', "autoNegotiation": "True"}}
+                              "PORT_CHANNEL": {'protoType': 'Transparent'}}
 
 RESOURCE_TEMPLATE = '{0}^{1}^{2}^{3}|'
 RESOURCE_ATTRIBUTE_TEMPLATE = '{0}^{1}^{2}|'
@@ -45,6 +45,8 @@ ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "PO
 
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
 PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT'}
+
+CLEANING_OUTPUT_TABLE = {r"'": lambda val: val.strip("'"), r'.+::.+': lambda val: val.split('::')[1]}
 
 
 class Element:
@@ -306,7 +308,6 @@ class JuniperSnmpAutoload:
             if len(DATAMODEL_ASSOCIATION[element.type_string]) == 2:
                 name = "{0} {1}".format(DATAMODEL_ASSOCIATION[element.type_string][1],
                                         element.relative_path.split("/")[-1])
-
             else:
                 name = element.content_description
             description_string += RESOURCE_TEMPLATE.format(DATAMODEL_ASSOCIATION[element.type_string][0],
@@ -336,9 +337,16 @@ class JuniperSnmpAutoload:
                 attribute_value = ATTRIBUTE_PERMANENT_VALUES[element.type_string][attribute]
             else:
                 attribute_value = element.attributes[attribute] if attribute in element.attributes else None
-            attribute_string += RESOURCE_ATTRIBUTE_TEMPLATE.format(element.relative_path, attribute_name,
-                                                                   attribute_value)
+            if attribute_name and attribute_value:
+                attribute_string += RESOURCE_ATTRIBUTE_TEMPLATE.format(element.relative_path, attribute_name,
+                                                                       self._cleaning_output(attribute_value))
         return attribute_string
+
+    def _cleaning_output(self, value):
+        for pattern in CLEANING_OUTPUT_TABLE:
+            if re.search(pattern, value):
+                value = CLEANING_OUTPUT_TABLE[pattern](value)
+        return value
 
     def _get_device_details(self):
         self._logger.info("Generate device details string")
@@ -421,7 +429,7 @@ if __name__ == '__main__':
     #     "{0}, {1}, {2}, {3}".format(port.attributes["ifDescr"], port.attributes["ifType"], port.relative_path,
     #                                 port.index) for port in
     #     snmp_autoload.ports.values()])))
-    # print(snmp_autoload.ports[534].attributes)
+    # print(snmp_autoload.ports[534].attributes)RF159832267CN
     # mm={}
     # for key in Port.ATTRIBUTE_NAMES:
     #     if key in snmp_autoload.ports[520].attributes:
