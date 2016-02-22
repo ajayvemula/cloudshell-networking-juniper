@@ -282,13 +282,16 @@ class JuniperSnmpAutoload:
         self._logger.info("Generating relative path for ports")
         fpc_pic_map = self.sort_elements_by_fpc_pic()
         for port in [p for p in self.ports.values() if p.logical_unit is '0']:
-            index = "{0}.{1}".format(port.fpc, port.pic)
-            if index in fpc_pic_map:
-                parent_path = fpc_pic_map[index].relative_path
-                port.relative_path = self._get_sutable_relative_path(parent_path)
+            if port.type_string is 'PORT_CHANNEL':
+                port.relative_path = self._get_sutable_relative_path(None)
             else:
-                parent_path = self.chassis[self.chassis.keys()[0]].relative_path
-                port.relative_path = self._get_sutable_relative_path(parent_path)
+                index = "{0}.{1}".format(port.fpc, port.pic)
+                if index in fpc_pic_map:
+                    parent_path = fpc_pic_map[index].relative_path
+                    port.relative_path = self._get_sutable_relative_path(parent_path)
+                else:
+                    parent_path = self.chassis[self.chassis.keys()[0]].relative_path
+                    port.relative_path = self._get_sutable_relative_path(parent_path)
 
     def sort_elements_by_fpc_pic(self):
         elements = {}
