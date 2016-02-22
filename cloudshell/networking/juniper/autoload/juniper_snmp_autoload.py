@@ -46,7 +46,8 @@ ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "PO
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
 PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT'}
 
-CLEANING_OUTPUT_TABLE = {r"'": lambda val: val.strip("'"), r'.+::.+': lambda val: val.split('::')[1]}
+OUTPUT_TABLE = {r"'": lambda val: val.strip("'"), r'.+::.+': lambda val: val.split('::')[1],
+                r'fullDuplex': lambda val: 'Full', r'halfDuplex': lambda val: 'Half'}
 
 
 class Element:
@@ -343,9 +344,9 @@ class JuniperSnmpAutoload:
         return attribute_string
 
     def _cleaning_output(self, value):
-        for pattern in CLEANING_OUTPUT_TABLE:
+        for pattern in OUTPUT_TABLE:
             if re.search(pattern, value):
-                value = CLEANING_OUTPUT_TABLE[pattern](value)
+                value = OUTPUT_TABLE[pattern](value)
         return value
 
     def _get_device_details(self):
