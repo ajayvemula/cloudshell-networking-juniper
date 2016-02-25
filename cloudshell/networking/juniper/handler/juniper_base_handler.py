@@ -4,7 +4,6 @@ import time
 from cloudshell.shell.core.handler_base import HandlerBase
 from cloudshell.networking.parameters_service.parameters_service import ParametersService
 from cloudshell.api.cloudshell_api import CloudShellAPISession
-from cloudshell.networking.juniper.autoload.juniper_snmp_autoload import JuniperSnmpAutoload
 from cloudshell.networking.juniper.command_templates.commit_rollback import COMMIT_ROLLBACK
 import re
 
@@ -12,9 +11,7 @@ import re
 class JuniperBaseHandler(HandlerBase):
     CONFIG_MODE_PROMPT = '.*# *$'
 
-    SPACE = '<QS_SP>'
-    RETURN = '<QS_CR>'
-    NEWLINE = '<QS_LF>'
+
 
     ERROR_LIST = [r'syntax\s+error,\s+expecting', r'error:\s+configuration\s+check-out\s+failed', r'syntax\s+error',
                   r'error:\s+Access\s+interface', r'Error\s+saving\s+configuration\s+to',
@@ -165,28 +162,6 @@ class JuniperBaseHandler(HandlerBase):
                 raise Exception(
                     'Output contains error with pattern: "{0}", for output: "{1}"'.format(error_pattern, output))
 
-    def discover_snmp(self):
-        """Load device structure, and all required Attribute according to Networking Elements Standardization design
-        :return: Attributes and Resources matrix,
-        currently in string format (matrix separated by '$', lines by '|', columns by ',')
-        """
-        # ToDo add voperation system validation
-        # if not self.is_valid_device_os():
-        # error_message = 'Incompatible driver! Please use correct resource driver for {0} operation system(s)'. \
-        #    format(str(tuple(self.supported_os)))
-        # self._logger.error(error_message)
-        # raise Exception(error_message)
-
-        self._logger.info('************************************************************************')
-        self._logger.info('Start SNMP discovery process .....')
-        generic_autoload = JuniperSnmpAutoload(self.snmp_handler, self._logger)
-        result = generic_autoload.discover_snmp()
-        self._logger.info('Start SNMP discovery Completed')
-        return result
-
-    def normalize_output(self, output):
-        return output.replace(' ', self.SPACE).replace('\r\n', self.NEWLINE).replace('\n', self.NEWLINE).replace('\r',
-                                                                                                                 self.NEWLINE)
 
     def get_commands_list(self, command_map):
         prepared_commands = []
