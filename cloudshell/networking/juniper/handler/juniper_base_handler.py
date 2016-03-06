@@ -181,4 +181,4 @@ class JuniperBaseHandler(HandlerBase):
         self.execute_command_map({'commit': []})
 
     def rollback(self):
-        self.send_config_command({'rollback': []})
+        self.execute_command_map({'rollback': []})
