@@ -1,2 +1,2 @@
-cloudshell-snmp
-cloudshell-core
+cloudshell-snmp<2.0
+cloudshell-core<2.0
