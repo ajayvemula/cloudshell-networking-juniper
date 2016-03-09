@@ -46,6 +46,8 @@ ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "PO
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
 PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT'}
 
+EXCLUDE_PORT_PATTERNS = [r'bme', r'vme', r'me', r'vlan']
+
 OUTPUT_TABLE = {r"'": lambda val: val.strip("'"), r'.+::.+': lambda val: val.split('::')[1],
                 r'fullDuplex': lambda val: 'Full', r'halfDuplex': lambda val: 'Half'}
 
@@ -252,9 +254,16 @@ class JuniperSnmpAutoload:
             if index in ip_addr_data:
                 port_attributes.update(ip_addr_data[index])
             self._map_attributes(port, Port.ATTRIBUTES_MAP, port_attributes)
-            if port.type.strip("'") in PORT_DEFINITION:
-                port.type_string = PORT_DEFINITION[port.type.strip("'")]
+            port.type = port.type.strip("'")
+            if port.type in PORT_DEFINITION and not self._port_excluded_by_description(port):
+                port.type_string = PORT_DEFINITION[port.type]
                 self.ports[index] = port
+
+    def _port_excluded_by_description(self, port):
+        for pattern in EXCLUDE_PORT_PATTERNS:
+            if re.search(pattern, port.name):
+                return True
+        return False
 
     def associate_portchannels(self):
         snmp_data = self.snmp_data['dot3adAggPortTable']
