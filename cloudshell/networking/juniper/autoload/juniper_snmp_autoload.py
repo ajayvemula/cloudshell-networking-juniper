@@ -44,7 +44,7 @@ ATTRIBUTE_DESCRIPTION = {"CHASSIS": "jnxContentsDescr", "MODULE": "jnxContainers
 ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "POWER_MODULE"}
 
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
-PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT'}
+PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT', 'fibreChannel': 'PORT'}
 
 EXCLUDE_PORT_PATTERNS = [r'bme', r'vme', r'me', r'vlan']
 
