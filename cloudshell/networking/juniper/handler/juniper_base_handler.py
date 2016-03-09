@@ -3,15 +3,12 @@ import time
 
 from cloudshell.shell.core.handler_base import HandlerBase
 from cloudshell.networking.parameters_service.parameters_service import ParametersService
-from cloudshell.api.cloudshell_api import CloudShellAPISession
 from cloudshell.networking.juniper.command_templates.commit_rollback import COMMIT_ROLLBACK
 import re
 
 
 class JuniperBaseHandler(HandlerBase):
     CONFIG_MODE_PROMPT = '.*# *$'
-
-
 
     ERROR_LIST = [r'syntax\s+error,\s+expecting', r'error:\s+configuration\s+check-out\s+failed', r'syntax\s+error',
                   r'error:\s+Access\s+interface', r'Error\s+saving\s+configuration\s+to',
@@ -20,7 +17,6 @@ class JuniperBaseHandler(HandlerBase):
     def __init__(self, connection_manager, logger=None):
         HandlerBase.__init__(self, connection_manager, logger)
         self._command_templates = {}
-        self._cloud_shell_api = None
         self._error_list = []
         self.add_error_list(JuniperBaseHandler.ERROR_LIST)
         self.add_command_templates(COMMIT_ROLLBACK)
@@ -41,21 +37,12 @@ class JuniperBaseHandler(HandlerBase):
     def snmp_handler(self, hsnmp):
         self._snmp_handler = hsnmp
 
-    def cloud_shell_api(self):
-        if not self._cloud_shell_api:
-            hostname = socket.gethostname()
-            testshell_ip = socket.gethostbyname(hostname)
-            testshell_user = self.reservation_dict['AdminUsername']
-            testshell_password = self.reservation_dict['AdminPassword']
-            testshell_domain = self.reservation_dict['Domain']
-            self._cloud_shell_api = CloudShellAPISession(testshell_ip, testshell_user, testshell_password,
-                                                         testshell_domain)
-        return self._cloud_shell_api
-
-    def send_commands_list(self, commands_list):
+    def send_commands_list(self, commands_list, send_command_func=None):
+        if not send_command_func:
+            send_command_func = self.send_config_command
         output = ""
         for command in commands_list:
-            output += self.send_config_command(command)
+            output += send_command_func(command)
         return output
 
     def _default_actions(self):
@@ -142,7 +129,7 @@ class JuniperBaseHandler(HandlerBase):
         self._logger.info(out)
         return out
 
-    def execute_command_map(self, command_map):
+    def execute_command_map(self, command_map, send_command_func=None):
         """
         Configures interface ethernet
         :param kwargs: dictionary of parameters
@@ -151,9 +138,9 @@ class JuniperBaseHandler(HandlerBase):
         """
 
         commands_list = self.get_commands_list(command_map)
-        output = self.send_commands_list(commands_list)
+        output = self.send_commands_list(commands_list, send_command_func)
         self._check_output_for_errors(output)
-        return '!'
+        return output
 
     def _check_output_for_errors(self, output):
         for error_pattern in self.ERROR_LIST:
@@ -161,7 +148,6 @@ class JuniperBaseHandler(HandlerBase):
                 self.rollback()
                 raise Exception(
                     'Output contains error with pattern: "{0}", for output: "{1}"'.format(error_pattern, output))
-
 
     def get_commands_list(self, command_map):
         prepared_commands = []
