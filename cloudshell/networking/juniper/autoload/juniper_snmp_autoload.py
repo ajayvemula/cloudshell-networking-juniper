@@ -44,7 +44,7 @@ ATTRIBUTE_DESCRIPTION = {"CHASSIS": "jnxContentsDescr", "MODULE": "jnxContainers
 ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "POWER_MODULE"}
 
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
-PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT', 'fibreChannel': 'PORT'}
+# PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT', 'fibreChannel': 'PORT'}
 
 EXCLUDE_PORT_PATTERNS = [r'bme', r'vme', r'me', r'vlan']
 
@@ -255,8 +255,9 @@ class JuniperSnmpAutoload:
                 port_attributes.update(ip_addr_data[index])
             self._map_attributes(port, Port.ATTRIBUTES_MAP, port_attributes)
             port.type = port.type.strip("'")
-            if port.type in PORT_DEFINITION and not self._port_excluded_by_description(port):
-                port.type_string = PORT_DEFINITION[port.type]
+            if not self._port_excluded_by_description(port):
+                # port.type_string = PORT_DEFINITION[port.type]
+                port.type_string = 'PORT'
                 self.ports[index] = port
 
     def _port_excluded_by_description(self, port):
@@ -280,6 +281,7 @@ class JuniperSnmpAutoload:
                 else:
                     associated_phisical_portchannel.attributes['associatedPorts'] = \
                         associated_phisical_port.name.replace("/", "-")
+                associated_phisical_port.type_string = 'PORT_CHANNEL'
 
     def _get_associated_phisical_port_by_name(self, name):
         for port in self.ports.values():
