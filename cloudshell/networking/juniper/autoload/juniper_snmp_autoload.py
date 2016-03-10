@@ -273,15 +273,16 @@ class JuniperSnmpAutoload:
             logical_portchannel_index = snmp_data[port_index]['dot3adAggPortAttachedAggID']
             associated_phisical_portchannel = self._get_associated_phisical_port_by_name(
                 self.ports[int(logical_portchannel_index)].name)
-            if associated_phisical_port and associated_phisical_portchannel:
-                if 'associatedPorts' in associated_phisical_portchannel.attributes:
-                    associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
-                        associated_phisical_portchannel.attributes['associatedPorts'],
-                        associated_phisical_port.name.replace("/", "-"))
-                else:
-                    associated_phisical_portchannel.attributes['associatedPorts'] = \
-                        associated_phisical_port.name.replace("/", "-")
-                associated_phisical_port.type_string = 'PORT_CHANNEL'
+            if associated_phisical_portchannel and associated_phisical_portchannel.type_string != 'PORT_CHANNEL':
+                associated_phisical_portchannel.type_string = 'PORT_CHANNEL'
+                if associated_phisical_port:
+                    if 'associatedPorts' in associated_phisical_portchannel.attributes:
+                        associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
+                            associated_phisical_portchannel.attributes['associatedPorts'],
+                            associated_phisical_port.name.replace("/", "-"))
+                    else:
+                        associated_phisical_portchannel.attributes['associatedPorts'] = \
+                            associated_phisical_port.name.replace("/", "-")
 
     def _get_associated_phisical_port_by_name(self, name):
         for port in self.ports.values():
