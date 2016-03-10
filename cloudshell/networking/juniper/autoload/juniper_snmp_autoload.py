@@ -85,7 +85,7 @@ class Element:
 
 class Port:
     ATTRIBUTES_MAP = {"pic": "ifChassisPic", "fpc": "ifChassisFpc", "logical_unit": "ifChassisLogicalUnit",
-                      "type": "ifType", "name": "ifDescr"}
+                      "type": "ifType", "name": "ifDescr", 'physical_id': 'ifChassisPort'}
 
     def __init__(self):
         self.index = None
@@ -97,6 +97,7 @@ class Port:
         self.relative_path = None
         self.name = None
         self.attributes = {}
+        self.physical_id = None
 
     def __str__(self):
         return "{0}, {1}, {2}, {3}".format(self.index, self.fpc, self.pic, self.relative_path)
@@ -290,6 +291,13 @@ class JuniperSnmpAutoload:
                 return port
         return None
 
+    def _remove_logical_ports(self):
+        physical_ports = {}
+        for port_index, port in self.ports.iteritems():
+            if port.type_string == 'PORT_CHANNEL' or port.physical_id > '0':
+                physical_ports[port_index] = port
+        self.ports = physical_ports
+
     def build_ports_relative_path(self):
         self._logger.info("Generating relative path for ports")
         fpc_pic_map = self.sort_elements_by_fpc_pic()
@@ -399,6 +407,7 @@ class JuniperSnmpAutoload:
 
         self.build_ports()
         self.associate_portchannels()
+        self._remove_logical_ports()
         self.build_ports_relative_path()
 
         result = "{0}${1}{2}".format(self._generate_description_string(), self._get_device_details(),
@@ -413,4 +422,3 @@ class JuniperSnmpAutoload:
 
         self._logger.info('*******************************************')
         return result
-
