@@ -1,6 +1,8 @@
 from cloudshell.networking.juniper.autoload.juniper_snmp_autoload import JuniperSnmpAutoload
 from cloudshell.networking.juniper.utils import FakeSnmpHandler
 from cloudshell.networking.juniper.examples.autoload_test_data import MIB_DATA_MAP
+# from cloudshell.networking.juniper.examples.autoload_srx220h_data import MIB_DATA_MAP
+from cloudshell.snmp.quali_snmp import QualiSnmp
 
 
 # from cloudshell.snmp.quali_snmp import QualiSnmp

@@ -45,8 +45,11 @@ ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "PO
 
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT', 'fibreChannel': 'PORT'}
+PORTCHANNEL_TYPES = ['ieee8023adLag']
 
-EXCLUDE_PORT_PATTERNS = [r'bme', r'vme', r'me', r'vlan']
+
+FILTER_PORTS_BY_DESCRIPTION = [r'bme', r'vme', r'me', r'vlan']
+FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle']
 
 OUTPUT_TABLE = {r"'": lambda val: val.strip("'"), r'.+::.+': lambda val: val.split('::')[1],
                 r'fullDuplex': lambda val: 'Full', r'halfDuplex': lambda val: 'Half'}
@@ -256,14 +259,20 @@ class JuniperSnmpAutoload:
                 port_attributes.update(ip_addr_data[index])
             self._map_attributes(port, Port.ATTRIBUTES_MAP, port_attributes)
             port.type = port.type.strip("'")
-            if not self._port_excluded_by_description(port):
+            if not self._port_filtered(port):
                 # port.type_string = PORT_DEFINITION[port.type]
-                port.type_string = 'PORT'
+                if port.type in PORTCHANNEL_TYPES:
+                    port.type_string = 'PORT_CHANNEL'
+                else:
+                    port.type_string = 'PORT'
                 self.ports[index] = port
 
-    def _port_excluded_by_description(self, port):
-        for pattern in EXCLUDE_PORT_PATTERNS:
+    def _port_filtered(self, port):
+        for pattern in FILTER_PORTS_BY_DESCRIPTION:
             if re.search(pattern, port.name):
+                return True
+
+        if port.type in FILTER_PORTS_BY_TYPE:
                 return True
         return False
 
@@ -274,8 +283,9 @@ class JuniperSnmpAutoload:
             logical_portchannel_index = snmp_data[port_index]['dot3adAggPortAttachedAggID']
             associated_phisical_portchannel = self._get_associated_phisical_port_by_name(
                 self.ports[int(logical_portchannel_index)].name)
-            if associated_phisical_portchannel and associated_phisical_portchannel.type_string != 'PORT_CHANNEL':
-                associated_phisical_portchannel.type_string = 'PORT_CHANNEL'
+            if associated_phisical_portchannel:
+                if associated_phisical_portchannel.type_string != 'PORT_CHANNEL':
+                    associated_phisical_portchannel.type_string = 'PORT_CHANNEL'
                 if associated_phisical_port:
                     if 'associatedPorts' in associated_phisical_portchannel.attributes:
                         associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
@@ -294,7 +304,7 @@ class JuniperSnmpAutoload:
     def _remove_logical_ports(self):
         physical_ports = {}
         for port_index, port in self.ports.iteritems():
-            if port.type_string == 'PORT_CHANNEL' or port.physical_id > '0':
+            if port.type_string == 'PORT_CHANNEL' or port.physical_id != '0':
                 physical_ports[port_index] = port
         self.ports = physical_ports
 
@@ -302,7 +312,7 @@ class JuniperSnmpAutoload:
         self._logger.info("Generating relative path for ports")
         fpc_pic_map = self.sort_elements_by_fpc_pic()
         for port in [p for p in self.ports.values() if p.logical_unit is '0']:
-            if port.type_string is 'PORT_CHANNEL':
+            if port.type_string == 'PORT_CHANNEL':
                 port.relative_path = self._get_sutable_relative_path(None)
             else:
                 index = "{0}.{1}".format(port.fpc, port.pic)
