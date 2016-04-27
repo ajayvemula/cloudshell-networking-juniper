@@ -118,6 +118,7 @@ class JuniperSnmpAutoload:
         self.index_table = {}
         self.snmp_data = {}
 
+
     def _load_tables(self):
         self._logger.info("Loading mibs")
         self._snmp_handler.load_mib('JUNIPER-MIB')
@@ -151,11 +152,13 @@ class JuniperSnmpAutoload:
         self.snmp_data["dot3StatsDuplexStatus"] = self._snmp_handler.walk(('EtherLike-MIB', 'dot3StatsDuplexStatus'))
         self._logger.info("Duplex table loaded")
 
-        self.snmp_data["dot3adAggPortTable"] = self._snmp_handler.walk(
-            ('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
+        self.snmp_data["dot3adAggPortTable"] = self._snmp_handler.walk(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         self._logger.info("Aggregation ports table loaded")
 
-        # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
+        # with open(os.path.join(os.path.dirname(__file__), 'autoload_debug_file.txt'), 'w') as debug_file:
+        #     debug_file.write(str(self.snmp_data))
+
+            # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
         # self._logger.info('ip v6 address table loaded')
 
         # 'EtherLike-MIB', 'dot3StatsTable'
@@ -281,19 +284,20 @@ class JuniperSnmpAutoload:
         for port_index in snmp_data:
             associated_phisical_port = self._get_associated_phisical_port_by_name(self.ports[int(port_index)].name)
             logical_portchannel_index = snmp_data[port_index]['dot3adAggPortAttachedAggID']
-            associated_phisical_portchannel = self._get_associated_phisical_port_by_name(
-                self.ports[int(logical_portchannel_index)].name)
-            if associated_phisical_portchannel:
-                if associated_phisical_portchannel.type_string != 'PORT_CHANNEL':
-                    associated_phisical_portchannel.type_string = 'PORT_CHANNEL'
-                if associated_phisical_port:
-                    if 'associatedPorts' in associated_phisical_portchannel.attributes:
-                        associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
-                            associated_phisical_portchannel.attributes['associatedPorts'],
-                            associated_phisical_port.name.replace("/", "-"))
-                    else:
-                        associated_phisical_portchannel.attributes['associatedPorts'] = \
-                            associated_phisical_port.name.replace("/", "-")
+            if logical_portchannel_index and int(logical_portchannel_index) > 0:
+                associated_phisical_portchannel = self._get_associated_phisical_port_by_name(
+                    self.ports[int(logical_portchannel_index)].name)
+                if associated_phisical_portchannel:
+                    if associated_phisical_portchannel.type_string != 'PORT_CHANNEL':
+                        associated_phisical_portchannel.type_string = 'PORT_CHANNEL'
+                    if associated_phisical_port:
+                        if 'associatedPorts' in associated_phisical_portchannel.attributes:
+                            associated_phisical_portchannel.attributes['associatedPorts'] = '{0},{1}'.format(
+                                associated_phisical_portchannel.attributes['associatedPorts'],
+                                associated_phisical_port.name.replace("/", "-"))
+                        else:
+                            associated_phisical_portchannel.attributes['associatedPorts'] = \
+                                associated_phisical_port.name.replace("/", "-")
 
     def _get_associated_phisical_port_by_name(self, name):
         for port in self.ports.values():
