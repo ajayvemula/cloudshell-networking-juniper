@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import re
 import os
-from cloudshell.networking.juniper.utils import sort_elements_by_attributes
+from cloudshell.networking.juniper.utils import sort_elements_by_attributes, sort_objects_by_attributes
 from cloudshell.core.logger import qs_logger
 
 ATTRIBUTE_MAPPING = {"PORT": {'ifType': 'L2 Protocol Type', 'ifPhysAddress': 'MAC Address', 'ifMtu': 'MTU',
@@ -46,7 +46,6 @@ ELEMENT_DEFINITION = {"1": "CHASSIS", "7": "MODULE", "8": "SUB_MODULE", "2": "PO
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", "ieee8023adLag": "PORT_CHANNEL"}
 # PORT_DEFINITION = {"ethernetCsmacd": "PORT", 'ieee8023adLag': 'PORT_CHANNEL', 'propVirtual': 'PORT', 'fibreChannel': 'PORT'}
 PORTCHANNEL_TYPES = ['ieee8023adLag']
-
 
 FILTER_PORTS_BY_DESCRIPTION = [r'bme', r'vme', r'me', r'vlan']
 FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle']
@@ -118,7 +117,6 @@ class JuniperSnmpAutoload:
         self.index_table = {}
         self.snmp_data = {}
 
-
     def _load_tables(self):
         self._logger.info("Loading mibs")
         self._snmp_handler.load_mib('JUNIPER-MIB')
@@ -152,13 +150,14 @@ class JuniperSnmpAutoload:
         self.snmp_data["dot3StatsDuplexStatus"] = self._snmp_handler.walk(('EtherLike-MIB', 'dot3StatsDuplexStatus'))
         self._logger.info("Duplex table loaded")
 
-        self.snmp_data["dot3adAggPortTable"] = self._snmp_handler.walk(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
+        self.snmp_data["dot3adAggPortTable"] = self._snmp_handler.walk(
+            ('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         self._logger.info("Aggregation ports table loaded")
 
         # with open(os.path.join(os.path.dirname(__file__), 'autoload_debug_file.txt'), 'w') as debug_file:
         #     debug_file.write(str(self.snmp_data))
 
-            # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
+        # self.ip_v6_table = self.snmp.walk(('IPV6-MIB', 'ipv6AddrEntry'))
         # self._logger.info('ip v6 address table loaded')
 
         # 'EtherLike-MIB', 'dot3StatsTable'
@@ -235,6 +234,34 @@ class JuniperSnmpAutoload:
             path = "{0}/{1}".format(parent_path, str(index))
         return path
 
+    def _is_relative_path_used(self, relative_path):
+        is_used = True
+        position = self.index_table
+        for index in relative_path.split('/'):
+            if int(index) in position:
+                position = position[int(index)]
+            else:
+                is_used = False
+        return is_used
+
+    def _add_relative_path(self, relative_path):
+        position = self.index_table
+        path_elements = relative_path.split('/')
+        element_index = 0
+        for index in range(0, len(path_elements)):
+            if int(path_elements[index]) in position:
+                position = position[int(path_elements[index])]
+            else:
+                element_index = index
+                break
+        for index in range(element_index, len(path_elements)):
+            position[int(path_elements[index])] = {}
+            position = position[int(path_elements[index])]
+
+    def _get_element_by_relative_path(self, relative_path):
+        sorted_by_path = sort_objects_by_attributes(self.elements.values(), 'relative_path')
+        return sorted_by_path[relative_path]
+
     def _sort_by_level(self, elements):
         level_map = {}
         for key in elements:
@@ -276,7 +303,7 @@ class JuniperSnmpAutoload:
                 return True
 
         if port.type in FILTER_PORTS_BY_TYPE:
-                return True
+            return True
         return False
 
     def associate_portchannels(self):
@@ -317,15 +344,37 @@ class JuniperSnmpAutoload:
         fpc_pic_map = self.sort_elements_by_fpc_pic()
         for port in [p for p in self.ports.values() if p.logical_unit is '0']:
             if port.type_string == 'PORT_CHANNEL':
-                port.relative_path = self._get_sutable_relative_path(None)
+                pc_id = re.findall(r'\d+', port.name)
+                if len(pc_id) > 0:
+                    port.relative_path = 'PC' + pc_id[0]
+                else:
+                    port.relative_path = port.name
             else:
                 index = "{0}.{1}".format(port.fpc, port.pic)
                 if index in fpc_pic_map:
                     parent_path = fpc_pic_map[index].relative_path
-                    port.relative_path = self._get_sutable_relative_path(parent_path)
                 else:
                     parent_path = self.chassis[self.chassis.keys()[0]].relative_path
-                    port.relative_path = self._get_sutable_relative_path(parent_path)
+
+                if port.physical_id is not None:
+                    port_relative_path = '{0}/{1}'.format(parent_path, port.physical_id)
+                else:
+                    port_relative_path = self._get_sutable_relative_path(parent_path)
+                port.relative_path = port_relative_path
+                if self._is_relative_path_used(port_relative_path):
+                    element = self._get_element_by_relative_path(port_relative_path)
+                    element_n = len(self.ports)
+                    suitable_path = '{0}/{1}'.format(parent_path, element_n)
+                    while True:
+                        if self._is_relative_path_used(suitable_path):
+                            element_n += 1
+                            suitable_path = '{0}/{1}'.format(parent_path, element_n)
+                        else:
+                            break
+                    element.relative_path = suitable_path
+                    self._add_relative_path(suitable_path)
+                else:
+                    self._add_relative_path(port_relative_path)
 
     def sort_elements_by_fpc_pic(self):
         elements = {}
