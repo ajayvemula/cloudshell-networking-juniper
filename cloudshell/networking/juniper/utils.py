@@ -12,6 +12,17 @@ def sort_elements_by_attributes(elements, *attributes):
     return sorted_map
 
 
+def sort_objects_by_attributes(object_list, *attributes):
+    sorted_map = {}
+    template = ".".join(["{%s}" % x for x in range(0, len(attributes))])
+    for obj in object_list:
+        index_values = [getattr(obj, key) for key in attributes if hasattr(obj, key) and getattr(obj, key) is not None]
+        if len(attributes) == len(index_values):
+            index = template.format(*index_values)
+            sorted_map[index] = obj
+    return sorted_map
+
+
 def build_mib_dict(data, name):
     mib_dict = QualiMibTable(name)
     for key, val in data:
