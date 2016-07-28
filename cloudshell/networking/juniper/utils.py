@@ -43,3 +43,6 @@ class FakeSnmpHandler:
 
     def update_mib_sources(self, path):
         pass
+
+    def load_data(self, mib, data):
+        self._mib_data_map[mib]=data
