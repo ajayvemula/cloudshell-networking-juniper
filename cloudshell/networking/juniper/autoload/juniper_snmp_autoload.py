@@ -396,6 +396,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         if_chassis_table = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisTable'))
 
         for index in if_chassis_table:
+            index = int(index)
             generic_port = GenericPort(index, self.snmp_handler)
             if not self._port_filtered_by_description(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
@@ -424,17 +425,18 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     def _associate_portchannels(self):
         snmp_data = self._snmp_handler.snmp_request(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         for port_index in snmp_data:
-            # self.logger.debug(port_index)
-            associated_phisical_port = self._get_associated_phisical_port_by_description(
-                self._logical_generic_ports[port_index].port_description)
-            logical_portchannel_index = _get_from_table('dot3adAggPortAttachedAggID', snmp_data[port_index])
-            if logical_portchannel_index and int(logical_portchannel_index) > 0:
-                associated_phisical_portchannel = self._get_associated_phisical_port_by_description(
+            port_index = int(port_index)
+            if port_index in self._logical_generic_ports:
+                associated_phisical_port = self._get_associated_phisical_port_by_description(
                     self._logical_generic_ports[port_index].port_description)
-                if associated_phisical_portchannel:
-                    associated_phisical_portchannel.is_portchannel = True
-                    if associated_phisical_port:
-                        associated_phisical_portchannel.associated_port_names.append(associated_phisical_port.name)
+                logical_portchannel_index = _get_from_table('dot3adAggPortAttachedAggID', snmp_data[port_index])
+                if logical_portchannel_index and int(logical_portchannel_index) in self._logical_generic_ports:
+                    associated_phisical_portchannel = self._get_associated_phisical_port_by_description(
+                        self._logical_generic_ports[int(logical_portchannel_index)].port_description)
+                    if associated_phisical_portchannel:
+                        associated_phisical_portchannel.is_portchannel = True
+                        if associated_phisical_port:
+                            associated_phisical_portchannel.associated_port_names.append(associated_phisical_port.name)
 
     def _get_associated_phisical_port_by_description(self, description):
         for port_description in self.generic_physical_ports_by_description:
@@ -466,7 +468,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 if generic_port.fpc_id > 0 and generic_port.fpc_id in self._modules:
                     fpc = self._modules.get(generic_port.fpc_id)
                     if fpc and generic_port.pic_id > 0:
-                        pic = self._get_pic_by_index(fpc, generic_port.pic_id)
+                        pic = self._get_pic_by_index(fpc, int(generic_port.pic_id))
                         if pic:
                             pic.ports.append(port)
                         else:
