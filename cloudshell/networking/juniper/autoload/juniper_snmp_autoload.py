@@ -11,15 +11,9 @@ from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
 from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER
 
 
-def _get_from_table(key, table):
-    if key in table:
-        return table[key]
-    else:
-        return None
-
-
 class GenericPort(object):
     PORTCHANNEL_DESCRIPTIONS = ['ae']
+    PORT_NAME_CHAR_REPLACEMENT = {'/': '-', ':': '--'}
     _IF_CHASSIS_TABLE = None
     _IF_MIB_TABLE = None
 
@@ -73,27 +67,27 @@ class GenericPort(object):
 
     @property
     def port_phis_id(self):
-        return _get_from_table('ifChassisPort', self.if_chassis_data)
+        return self.if_chassis_data.get('ifChassisPort')
 
     @property
     def port_description(self):
-        return _get_from_table('ifDescr', self.if_mib_data)
+        return self.if_mib_data.get('ifDescr')
 
     @property
     def logical_unit(self):
-        return _get_from_table('ifChassisLogicalUnit', self.if_chassis_data)
+        return self.if_chassis_data.get('ifChassisLogicalUnit')
 
     @property
     def fpc_id(self):
-        return _get_from_table('ifChassisFpc', self.if_chassis_data)
+        return self.if_chassis_data.get('ifChassisFpc')
 
     @property
     def pic_id(self):
-        return _get_from_table('ifChassisPic', self.if_chassis_data)
+        return self.if_chassis_data.get('ifChassisPic')
 
     @property
     def type(self):
-        return _get_from_table('ifType', self.if_mib_data)
+        return self.if_mib_data.get('ifType').strip('\'')
 
     @property
     def name(self):
@@ -101,8 +95,9 @@ class GenericPort(object):
 
     @staticmethod
     def _convert_port_name(port_name):
-        port_name_converted = port_name.replace("/", "-")
-        return port_name_converted
+        for char, replacement in GenericPort.PORT_NAME_CHAR_REPLACEMENT.iteritems():
+            port_name = port_name.replace(char, replacement)
+        return port_name
 
     def _get_associated_ipv4_address(self):
         if len(self.ipv4_addresses) > 0:
@@ -133,14 +128,14 @@ class GenericPort(object):
     def get_port(self):
         port = Port(self.port_phis_id, self.name)
         port_attributes = dict()
-        port_attributes[PortAttributes.PORT_DESCRIPTION] = _get_from_table('ifDescr', self.if_mib_data)
-        port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type.strip('\'')
-        port_attributes[PortAttributes.MAC_ADDRESS] = _get_from_table('ifPhysAddress', self.if_mib_data)
-        port_attributes[PortAttributes.MTU] = _get_from_table('ifMtu', self.if_mib_data)
-        port_attributes[PortAttributes.BANDWIDTH] = _get_from_table('ifSpeed', self.if_mib_data)
+        port_attributes[PortAttributes.PORT_DESCRIPTION] = self.if_mib_data.get('ifDescr')
+        port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
+        port_attributes[PortAttributes.MAC_ADDRESS] = self.if_mib_data.get('ifPhysAddress')
+        port_attributes[PortAttributes.MTU] = self.if_mib_data.get('ifMtu')
+        port_attributes[PortAttributes.BANDWIDTH] = self.if_mib_data.get('ifSpeed')
         port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_attributes[PortAttributes.PROTOCOL_TYPE] = _get_from_table('protoType', self.if_mib_data)
+        port_attributes[PortAttributes.PROTOCOL_TYPE] = self.if_mib_data.get('protoType')
         port_attributes[PortAttributes.DUPLEX] = self._get_port_duplex()
         port_attributes[PortAttributes.AUTO_NEGOTIATION] = self._get_port_autoneg()
         port_attributes[PortAttributes.ADJACENT] = self._get_port_adjacent()
@@ -153,15 +148,15 @@ class GenericPort(object):
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
         port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_channel_attributes[PortChannelAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = _get_from_table('protoType', self.if_mib_data)
+        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = self.if_mib_data.get('protoType')
         port_channel_attributes[PortChannelAttributes.ASSOCIATED_PORTS] = ','.join(self.associated_port_names)
         port_channel.build_attributes(port_channel_attributes)
         return port_channel
 
 
 class JuniperSnmpAutoload(AutoloadOperationsInterface):
-    FILTER_PORTS_BY_DESCRIPTION = [r'bme', r'vme', r'me', r'vlan', r'gr', r'vt', r'mt', r'mams']
-    FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle']
+    FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap']
+    FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
 
     def __init__(self, snmp_handler=None, logger=None):
         self._logical_generic_ports = {}
@@ -247,7 +242,6 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.snmp_handler.update_mib_sources(path)
         self.logger.info("Loading mibs")
         self.snmp_handler.load_mib('JUNIPER-MIB')
-        self.snmp_handler.load_mib('JUNIPER-SMI')
         self.snmp_handler.load_mib('JUNIPER-IF-MIB')
         self.snmp_handler.load_mib('IF-MIB')
         self.snmp_handler.load_mib('JUNIPER-CHASSIS-DEFINES-MIB')
@@ -293,17 +287,16 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 chassis = Chassis(chassis_id)
 
                 chassis_attributes = dict()
-                model_string = _get_from_table('jnxContainersType', container_table[int(index1)])
+                model_string = container_table[int(index1)].get('jnxContainersType')
                 model_list = model_string.split('::')
                 if len(model_list) == 2:
                     chassis_attributes[ChassisAttributes.MODEL] = model_list[1]
                 else:
                     chassis_attributes[ChassisAttributes.MODEL] = model_string
-                chassis_attributes[ChassisAttributes.SERIAL_NUMBER] = _get_from_table('jnxContentsSerialNo',
-                                                                                      content_data)
+                chassis_attributes[ChassisAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 chassis.build_attributes(chassis_attributes)
                 self._root.chassis.append(chassis)
-                self._chassis[_get_from_table('jnxContentsChassisId', content_data)] = chassis
+                self._chassis[content_data.get('jnxContentsChassisId')] = chassis
 
     def _build_power_modules(self):
         self.logger.debug('Building PowerPorts')
@@ -317,20 +310,17 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 element = PowerPort(element_id)
 
                 element_attributes = dict()
-                model_string = _get_from_table('jnxContentsType', content_data)
+                model_string = content_data.get('jnxContentsType')
                 model_list = model_string.split('::')
                 if len(model_list) == 2:
                     element_attributes[PowerPortAttributes.MODEL] = model_list[1]
                 else:
                     element_attributes[PowerPortAttributes.MODEL] = model_string
-                element_attributes[PowerPortAttributes.PORT_DESCRIPTION] = _get_from_table('jnxContentsDescr',
-                                                                                           content_data)
-                element_attributes[PowerPortAttributes.SERIAL_NUMBER] = _get_from_table('jnxContentsSerialNo',
-                                                                                        content_data)
-                element_attributes[PowerPortAttributes.VERSION] = _get_from_table('jnxContentsRevision',
-                                                                                  content_data)
+                element_attributes[PowerPortAttributes.PORT_DESCRIPTION] = content_data.get('jnxContentsDescr')
+                element_attributes[PowerPortAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
+                element_attributes[PowerPortAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
-                chassis_id = _get_from_table('jnxContentsChassisId', content_data)
+                chassis_id = content_data.get('jnxContentsChassisId')
                 if chassis_id in self._chassis:
                     chassis = self._chassis[chassis_id]
                     chassis.power_ports.append(element)
@@ -347,18 +337,16 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 element = Module(element_id)
 
                 element_attributes = dict()
-                model_string = _get_from_table('jnxContentsType', content_data)
+                model_string = content_data.get('jnxContentsType')
                 model_list = model_string.split('::')
                 if len(model_list) == 2:
                     element_attributes[ModuleAttributes.MODEL] = model_list[1]
                 else:
                     element_attributes[ModuleAttributes.MODEL] = model_string
-                element_attributes[ModuleAttributes.SERIAL_NUMBER] = _get_from_table('jnxContentsSerialNo',
-                                                                                     content_data)
-                element_attributes[ModuleAttributes.VERSION] = _get_from_table('jnxContentsRevision',
-                                                                               content_data)
+                element_attributes[ModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
+                element_attributes[ModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
-                chassis_id = _get_from_table('jnxContentsChassisId', content_data)
+                chassis_id = content_data.get('jnxContentsChassisId')
                 if chassis_id in self._chassis:
                     chassis = self._chassis[chassis_id]
                     chassis.modules.append(element)
@@ -376,23 +364,21 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 element_id = index3
                 element = SubModule(element_id)
                 element_attributes = dict()
-                model_string = _get_from_table('jnxContentsType', content_data)
+                model_string = content_data.get('jnxContentsType')
                 model_list = model_string.split('::')
                 if len(model_list) == 2:
                     element_attributes[SubModuleAttributes.MODEL] = model_list[1]
                 else:
                     element_attributes[SubModuleAttributes.MODEL] = model_string
-                element_attributes[SubModuleAttributes.SERIAL_NUMBER] = _get_from_table('jnxContentsSerialNo',
-                                                                                        content_data)
-                element_attributes[SubModuleAttributes.VERSION] = _get_from_table('jnxContentsRevision',
-                                                                                  content_data)
+                element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
+                element_attributes[SubModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
                 if parent_id in self._modules:
                     self._modules[parent_id].sub_modules.append(element)
                     self.sub_modules[element_id] = element
 
     def _build_generic_ports(self):
-        self.logger.debug("Building ports")
+        self.logger.debug("Building generic ports")
         if_chassis_table = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisTable'))
 
         for index in if_chassis_table:
@@ -405,31 +391,34 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     self._logical_generic_ports[index] = generic_port
 
     def _associate_ipv4_addresses(self):
+        self.logger.debug("Associate ipv4")
         for index in self.ipv4_table:
             if int(index) in self._logical_generic_ports:
                 logical_port = self._logical_generic_ports[int(index)]
                 physical_port = self._get_associated_phisical_port_by_description(logical_port.port_description)
-                ipv4_address = _get_from_table('ipAdEntAddr', self.ipv4_table[index])
-                if ipv4_address:
+                ipv4_address = self.ipv4_table[index].get('ipAdEntAddr')
+                if physical_port and ipv4_address:
                     physical_port.ipv4_addresses.append(ipv4_address)
 
     def _associate_ipv6_addresses(self):
+        self.logger.debug("Associate ipv6")
         for index in self.ipv6_table:
             if int(index) in self._logical_generic_ports:
                 logical_port = self._logical_generic_ports[int(index)]
                 physical_port = self._get_associated_phisical_port_by_description(logical_port.port_description)
-                ipv6_address = _get_from_table('ipAdEntAddr', self.ipv6_table[index])
+                ipv6_address = self.ipv6_table[index].get('ipAdEntAddr')
                 if ipv6_address:
                     physical_port.ipv6_addresses.append(ipv6_address)
 
     def _associate_portchannels(self):
+        self.logger.debug("Associate portchannels")
         snmp_data = self._snmp_handler.snmp_request(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         for port_index in snmp_data:
             port_index = int(port_index)
             if port_index in self._logical_generic_ports:
                 associated_phisical_port = self._get_associated_phisical_port_by_description(
                     self._logical_generic_ports[port_index].port_description)
-                logical_portchannel_index = _get_from_table('dot3adAggPortAttachedAggID', snmp_data[port_index])
+                logical_portchannel_index = snmp_data[port_index].get('dot3adAggPortAttachedAggID')
                 if logical_portchannel_index and int(logical_portchannel_index) in self._logical_generic_ports:
                     associated_phisical_portchannel = self._get_associated_phisical_port_by_description(
                         self._logical_generic_ports[int(logical_portchannel_index)].port_description)
@@ -456,6 +445,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         return False
 
     def _build_ports(self):
+        self.logger.debug("Building ports")
         self._build_generic_ports()
         self._associate_ipv4_addresses()
         self._associate_ipv6_addresses()
