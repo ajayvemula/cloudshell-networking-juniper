@@ -3,6 +3,7 @@ from cloudshell.networking.autoload.networking_attributes import RootAttributes,
 from cloudshell.networking.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, PowerPort, \
     PortChannel
 from cloudshell.networking.operations.interfaces.autoload_operations_interface import AutoloadOperationsInterface
+from cloudshell.shell.core.config_utils import override_attributes_from_config
 import inject
 import re
 import os
@@ -13,7 +14,7 @@ from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER
 
 class GenericPort(object):
     PORTCHANNEL_DESCRIPTIONS = ['ae']
-    PORT_NAME_CHAR_REPLACEMENT = {'/': '-', ':': '--'}
+    PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
     _IF_CHASSIS_TABLE = None
     _IF_MIB_TABLE = None
 
@@ -34,6 +35,9 @@ class GenericPort(object):
             self.is_portchannel = True
         else:
             self.is_portchannel = False
+
+        overridden_config = override_attributes_from_config(GenericPort)
+        self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
 
     @property
     def if_chassis_table(self):
@@ -93,9 +97,8 @@ class GenericPort(object):
     def name(self):
         return self._convert_port_name(self.port_description)
 
-    @staticmethod
-    def _convert_port_name(port_name):
-        for char, replacement in GenericPort.PORT_NAME_CHAR_REPLACEMENT.iteritems():
+    def _convert_port_name(self, port_name):
+        for char, replacement in self._port_name_char_replacement.iteritems():
             port_name = port_name.replace(char, replacement)
         return port_name
 
@@ -157,6 +160,7 @@ class GenericPort(object):
 class JuniperSnmpAutoload(AutoloadOperationsInterface):
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
+    SUPPORTED_OS = [r'[Jj]uniper']
 
     def __init__(self, snmp_handler=None, logger=None):
         self._logical_generic_ports = {}
@@ -178,6 +182,9 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._autoneg = None
 
         self._logger = logger
+        """Override attributes from global config"""
+        overridden_config = override_attributes_from_config(JuniperSnmpAutoload)
+        self._supported_os = overridden_config.SUPPORTED_OS
 
     @property
     def logger(self):
@@ -475,6 +482,25 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 return pic
         return None
 
+    def _is_valid_device_os(self):
+        """Validate device OS using snmp
+            :return: True or False
+        """
+
+        system_description = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysDescr', 0))
+        self.logger.debug('Detected system description: \'{0}\''.format(system_description))
+        result = re.search(r"({0})".format("|".join(self._supported_os)),
+                           system_description,
+                           flags=re.DOTALL | re.IGNORECASE)
+
+        if result:
+            return True
+        else:
+            error_message = 'Incompatible driver! Please use this driver for \'{0}\' operation system(s)'. \
+                format(str(tuple(self._supported_os)))
+            self.logger.error(error_message)
+            return False
+
     def _log_autoload_details(self, autoload_details):
         self.logger.debug('-------------------- <RESOURCES> ----------------------')
         for resource in autoload_details.resources:
@@ -488,6 +514,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.logger.debug('-------------------- </ATTRIBUTES> ---------------------')
 
     def discover(self):
+        if not self._is_valid_device_os():
+            raise Exception(self.__class__.__name__, 'Unsupported device OS')
         self._build_root()
         self._build_chassis()
         self._build_power_modules()
