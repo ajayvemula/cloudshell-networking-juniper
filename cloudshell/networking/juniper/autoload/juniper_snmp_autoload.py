@@ -285,21 +285,15 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.logger.debug('Building Chassis')
         element_index = '1'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
-        container_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContainersTable'))
         for key in content_table:
-            index1, index2, index3, index = key.split('.')
+            index1, index2, index3, index = key.split('.')[:4]
             if index1 == element_index:
                 content_data = content_table[key]
                 chassis_id = index2
                 chassis = Chassis(chassis_id)
 
                 chassis_attributes = dict()
-                model_string = container_table[int(index1)].get('jnxContainersType')
-                model_list = model_string.split('::')
-                if len(model_list) == 2:
-                    chassis_attributes[ChassisAttributes.MODEL] = model_list[1]
-                else:
-                    chassis_attributes[ChassisAttributes.MODEL] = model_string
+                chassis_attributes[ChassisAttributes.MODEL] = self._get_element_model(content_data)
                 chassis_attributes[ChassisAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 chassis.build_attributes(chassis_attributes)
                 self._root.chassis.append(chassis)
@@ -310,19 +304,14 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         element_index = '2'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
         for key in content_table:
-            index1, index2, index3, index = key.split('.')
+            index1, index2, index3, index = key.split('.')[:4]
             if index1 == element_index:
                 content_data = content_table[key]
                 element_id = index2
                 element = PowerPort(element_id)
 
                 element_attributes = dict()
-                model_string = content_data.get('jnxContentsType')
-                model_list = model_string.split('::')
-                if len(model_list) == 2:
-                    element_attributes[PowerPortAttributes.MODEL] = model_list[1]
-                else:
-                    element_attributes[PowerPortAttributes.MODEL] = model_string
+                element_attributes[PowerPortAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[PowerPortAttributes.PORT_DESCRIPTION] = content_data.get('jnxContentsDescr')
                 element_attributes[PowerPortAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 element_attributes[PowerPortAttributes.VERSION] = content_data.get('jnxContentsRevision')
@@ -337,19 +326,14 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         element_index = '7'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
         for key in content_table:
-            index1, index2, index3, index = key.split('.')
+            index1, index2, index3, index = key.split('.')[:4]
             if index1 == str(element_index):
                 content_data = content_table[key]
                 element_id = index2
                 element = Module(element_id)
 
                 element_attributes = dict()
-                model_string = content_data.get('jnxContentsType')
-                model_list = model_string.split('::')
-                if len(model_list) == 2:
-                    element_attributes[ModuleAttributes.MODEL] = model_list[1]
-                else:
-                    element_attributes[ModuleAttributes.MODEL] = model_string
+                element_attributes[ModuleAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[ModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 element_attributes[ModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
@@ -364,25 +348,27 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         element_index = '8'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
         for key in content_table:
-            index1, index2, index3, index = key.split('.')
+            index1, index2, index3, index = key.split('.')[:4]
             if index1 == str(element_index):
                 content_data = content_table[key]
                 parent_id = index2
                 element_id = index3
                 element = SubModule(element_id)
                 element_attributes = dict()
-                model_string = content_data.get('jnxContentsType')
-                model_list = model_string.split('::')
-                if len(model_list) == 2:
-                    element_attributes[SubModuleAttributes.MODEL] = model_list[1]
-                else:
-                    element_attributes[SubModuleAttributes.MODEL] = model_string
+                element_attributes[SubModuleAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 element_attributes[SubModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
                 if parent_id in self._modules:
                     self._modules[parent_id].sub_modules.append(element)
                     self.sub_modules[element_id] = element
+
+    @staticmethod
+    def _get_element_model(content_data):
+        model_string = content_data.get('jnxContentsModel')
+        if not model_string:
+            model_string = content_data.get('jnxContentsType').split('::')[-1]
+        return model_string
 
     def _build_generic_ports(self):
         self.logger.debug("Building generic ports")
