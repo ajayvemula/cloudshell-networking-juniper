@@ -16,6 +16,7 @@ class JuniperCliService(CliService):
                                                                       logger, session, **optional_args)
         except CommandExecutionException:
             self.rollback()
+            raise 
 
     @inject.params(logger=LOGGER, session=SESSION)
     def commit(self, expected_map=None, logger=None, session=None):
