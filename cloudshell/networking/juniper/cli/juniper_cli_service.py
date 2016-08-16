@@ -21,7 +21,7 @@ class JuniperCliService(CliService):
     def commit(self, expected_map=None, logger=None, session=None):
         logger.debug('Commit called')
         try:
-            self._send_command(JUNIPER_COMMIT.get_command(), expected_map=expected_map)
+            self._send_command(JUNIPER_COMMIT.get_command(), expected_map=expected_map, session=session)
         except CommandExecutionException:
             self.rollback()
             raise
