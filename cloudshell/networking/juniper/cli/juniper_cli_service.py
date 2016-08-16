@@ -7,6 +7,8 @@ import inject
 
 
 class JuniperCliService(CliService):
+
+    @inject.params(logger=LOGGER, session=SESSION)
     def send_config_command(self, command, expected_str=None, expected_map=None, error_map=None, logger=None,
                             session=None, **optional_args):
         try:
