@@ -1,4 +1,4 @@
-from cloudshell.networking.parameters_service.command_template import CommandTemplate
+from cloudshell.cli.command_template.command_template import CommandTemplate
 
-COMMIT_ROLLBACK = {'commit': CommandTemplate('commit', [], []),
-                   'rollback': CommandTemplate('rollback', [], [])}
+JUNIPER_COMMIT = CommandTemplate('commit', [], [])
+JUNIPER_ROLLBACK = CommandTemplate('rollback', [], [])
