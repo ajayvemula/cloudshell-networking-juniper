@@ -7,6 +7,8 @@ import inject
 
 
 class JuniperCliService(CliService):
+
+    @inject.params(logger=LOGGER, session=SESSION)
     def send_config_command(self, command, expected_str=None, expected_map=None, error_map=None, logger=None,
                             session=None, **optional_args):
         try:
@@ -27,4 +29,4 @@ class JuniperCliService(CliService):
     @inject.params(logger=LOGGER, session=SESSION)
     def rollback(self, expected_map=None, logger=None, session=None):
         logger.debug('Rollback called')
-        self.send_config_command(JUNIPER_ROLLBACK.get_command(), expected_map=expected_map)
+        self._send_command(JUNIPER_ROLLBACK.get_command(), expected_map=expected_map, session=session)
