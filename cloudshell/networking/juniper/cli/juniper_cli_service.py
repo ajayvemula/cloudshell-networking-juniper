@@ -11,6 +11,17 @@ class JuniperCliService(CliService):
     @inject.params(logger=LOGGER, session=SESSION)
     def send_config_command(self, command, expected_str=None, expected_map=None, error_map=None, logger=None,
                             session=None, **optional_args):
+        """
+        Overridden method, added rollback call for CommandExecutionException
+        :param command:
+        :param expected_str:
+        :param expected_map:
+        :param error_map:
+        :param logger:
+        :param session:
+        :param optional_args:
+        :return:
+        """
         try:
             return super(JuniperCliService, self).send_config_command(command, expected_str, expected_map, error_map,
                                                                       logger, session, **optional_args)
@@ -20,6 +31,13 @@ class JuniperCliService(CliService):
 
     @inject.params(logger=LOGGER, session=SESSION)
     def commit(self, expected_map=None, logger=None, session=None):
+        """
+        Call commit command
+        :param expected_map:
+        :param logger:
+        :param session:
+        :return:
+        """
         logger.debug('Commit called')
         try:
             self._send_command(JUNIPER_COMMIT.get_command(), expected_map=expected_map, session=session)
@@ -29,5 +47,12 @@ class JuniperCliService(CliService):
 
     @inject.params(logger=LOGGER, session=SESSION)
     def rollback(self, expected_map=None, logger=None, session=None):
+        """
+        Call rollback command
+        :param expected_map:
+        :param logger:
+        :param session:
+        :return:
+        """
         logger.debug('Rollback called')
         self._send_command(JUNIPER_ROLLBACK.get_command(), expected_map=expected_map, session=session)

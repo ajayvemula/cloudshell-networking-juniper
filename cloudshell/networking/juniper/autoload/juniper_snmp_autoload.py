@@ -13,12 +13,21 @@ from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER
 
 
 class GenericPort(object):
+    """
+    Collect information and build Port or PortChannel
+    """
     PORTCHANNEL_DESCRIPTIONS = ['ae']
     PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
     _IF_CHASSIS_TABLE = None
     _IF_MIB_TABLE = None
 
     def __init__(self, index, snmp_handler):
+        """
+        Create GenericPort with index and snmp handler
+        :param index:
+        :param snmp_handler:
+        :return:
+        """
         self.associated_port_names = []
         self._if_chassis_data = None
         self._if_mib_data = None
@@ -129,6 +138,10 @@ class GenericPort(object):
         return None
 
     def get_port(self):
+        """
+        Build Port instance using collected information
+        :return:
+        """
         port = Port(self.port_phis_id, self.name)
         port_attributes = dict()
         port_attributes[PortAttributes.PORT_DESCRIPTION] = self.if_mib_data.get('ifDescr')
@@ -146,6 +159,10 @@ class GenericPort(object):
         return port
 
     def get_portchannel(self):
+        """
+        Build PortChannel instance using collected information
+        :return:
+        """
         port_channel = PortChannel(self.port_phis_id, self.name)
         port_channel_attributes = dict()
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
@@ -158,6 +175,9 @@ class GenericPort(object):
 
 
 class JuniperSnmpAutoload(AutoloadOperationsInterface):
+    """
+    Load inventory by snmp and build device elements and attributes
+    """
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
     SUPPORTED_OS = [r'[Jj]uniper']
@@ -245,6 +265,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         return result
 
     def _initialize_snmp_handler(self):
+        """
+        Snmp settings and load specific mibs
+        :return:
+        """
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mibs'))
         self.snmp_handler.update_mib_sources(path)
         self.logger.info("Loading mibs")
@@ -258,6 +282,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.snmp_handler.load_mib('IPV6-MIB')
 
     def _build_root(self):
+        """
+        Collect device root attributes
+        :return:
+        """
         self.logger.info("Building Root")
         vendor = ''
         model = ''
@@ -282,6 +310,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._root.build_attributes(root_attributes)
 
     def _build_chassis(self):
+        """
+        Build Chassis resources and attributes
+        :return:
+        """
         self.logger.debug('Building Chassis')
         element_index = '1'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
@@ -300,6 +332,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 self._chassis[content_data.get('jnxContentsChassisId')] = chassis
 
     def _build_power_modules(self):
+        """
+        Build Power modules resources and attributes
+        :return:
+        """
         self.logger.debug('Building PowerPorts')
         element_index = '2'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
@@ -322,6 +358,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     chassis.power_ports.append(element)
 
     def _build_modules(self):
+        """
+        Build Modules resources and attributes
+        :return:
+        """
         self.logger.debug('Building Modules')
         element_index = '7'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
@@ -344,6 +384,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     self._modules[element_id] = element
 
     def _build_sub_modules(self):
+        """
+        Build SubModules resources and attributes
+        :return:
+        """
         self.logger.debug('Building Sub Modules')
         element_index = '8'
         content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
@@ -371,6 +415,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         return model_string
 
     def _build_generic_ports(self):
+        """
+        Build GenericPort instances
+        :return:
+        """
         self.logger.debug("Building generic ports")
         if_chassis_table = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisTable'))
 
@@ -384,6 +432,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     self._logical_generic_ports[index] = generic_port
 
     def _associate_ipv4_addresses(self):
+        """
+        Associates ipv4 with generic port
+        :return:
+        """
         self.logger.debug("Associate ipv4")
         for index in self.ipv4_table:
             if int(index) in self._logical_generic_ports:
@@ -394,6 +446,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     physical_port.ipv4_addresses.append(ipv4_address)
 
     def _associate_ipv6_addresses(self):
+        """
+        Associate ipv6 with generic port
+        :return:
+        """
         self.logger.debug("Associate ipv6")
         for index in self.ipv6_table:
             if int(index) in self._logical_generic_ports:
@@ -404,6 +460,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     physical_port.ipv6_addresses.append(ipv6_address)
 
     def _associate_portchannels(self):
+        """
+        Associate physical ports with the portchannel
+        :return:
+        """
         self.logger.debug("Associate portchannels")
         snmp_data = self._snmp_handler.snmp_request(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         for port_index in snmp_data:
@@ -421,23 +481,42 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                             associated_phisical_portchannel.associated_port_names.append(associated_phisical_port.name)
 
     def _get_associated_phisical_port_by_description(self, description):
+        """
+        Associate physical port by description
+        :param description:
+        :return:
+        """
         for port_description in self.generic_physical_ports_by_description:
             if port_description in description:
                 return self.generic_physical_ports_by_description[port_description]
         return None
 
     def _port_filtered_by_description(self, port):
+        """
+        Filter ports by description
+        :param port:
+        :return:
+        """
         for pattern in self.FILTER_PORTS_BY_DESCRIPTION:
             if re.search(pattern, port.port_description):
                 return True
         return False
 
     def _port_filtered_by_type(self, port):
+        """
+        Filter ports by type
+        :param port:
+        :return:
+        """
         if port.type in self.FILTER_PORTS_BY_TYPE:
             return True
         return False
 
     def _build_ports(self):
+        """
+        Associate ports with the structure resources and build Ports and PortChannels
+        :return:
+        """
         self.logger.debug("Building ports")
         self._build_generic_ports()
         self._associate_ipv4_addresses()
@@ -488,6 +567,11 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             return False
 
     def _log_autoload_details(self, autoload_details):
+        """
+        Logging autoload details
+        :param autoload_details:
+        :return:
+        """
         self.logger.debug('-------------------- <RESOURCES> ----------------------')
         for resource in autoload_details.resources:
             self.logger.debug('{0}, {1}'.format(resource.relative_address, resource.name))
@@ -500,6 +584,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.logger.debug('-------------------- </ATTRIBUTES> ---------------------')
 
     def discover(self):
+        """
+        Call methods in specific order to build resources and attributes
+        :return:
+        """
         if not self._is_valid_device_os():
             raise Exception(self.__class__.__name__, 'Unsupported device OS')
         self._build_root()
