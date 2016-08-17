@@ -2,7 +2,7 @@ from cloudshell.cli.service.cli_exceptions import CommandExecutionException
 from cloudshell.cli.service.cli_service import CliService
 from cloudshell.configuration.cloudshell_cli_binding_keys import SESSION
 from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER
-from cloudshell.networking.juniper.command_templates.commit_rollback import JUNIPER_COMMIT, JUNIPER_ROLLBACK
+import cloudshell.networking.juniper.command_templates.commit_rollback as commit_rollback
 import inject
 
 
@@ -40,7 +40,7 @@ class JuniperCliService(CliService):
         """
         logger.debug('Commit called')
         try:
-            self._send_command(JUNIPER_COMMIT.get_command(), expected_map=expected_map, session=session)
+            self._send_command(commit_rollback.COMMIT.get_command(), expected_map=expected_map, session=session)
         except CommandExecutionException:
             self.rollback()
             raise
@@ -55,4 +55,4 @@ class JuniperCliService(CliService):
         :return:
         """
         logger.debug('Rollback called')
-        self._send_command(JUNIPER_ROLLBACK.get_command(), expected_map=expected_map, session=session)
+        self._send_command(commit_rollback.ROLLBACK.get_command(), expected_map=expected_map, session=session)
