@@ -9,7 +9,7 @@ import re
 import os
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
 from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
-from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER
+from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, CONFIG
 
 
 class GenericPort(object):
@@ -182,7 +182,12 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
     SUPPORTED_OS = [r'[Jj]uniper']
 
-    def __init__(self, snmp_handler=None, logger=None):
+    def __init__(self, snmp_handler=None, logger=None, config=None):
+        self._logger = logger
+        self._snmp_handler = None
+        self.snmp_handler = snmp_handler
+        self._config = config
+
         self._logical_generic_ports = {}
         self._physical_generic_ports = {}
         self._generic_physical_ports_by_description = None
@@ -193,24 +198,22 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._chassis = {}
         self._root = RootElement()
 
-        self._snmp_handler = None
-        self.snmp_handler = snmp_handler
-
         self._ipv4_table = None
         self._ipv6_table = None
         self._if_duplex_table = None
         self._autoneg = None
 
-        self._logger = logger
         """Override attributes from global config"""
-        overridden_config = override_attributes_from_config(JuniperSnmpAutoload)
+        overridden_config = override_attributes_from_config(JuniperSnmpAutoload, config=self.config)
         self._supported_os = overridden_config.SUPPORTED_OS
 
     @property
     def logger(self):
-        if self._logger is not None:
-            return self._logger
-        return inject.instance(LOGGER)
+        return self._logger or inject.instance(LOGGER)
+
+    @property
+    def config(self):
+        return self._config or inject.instance(CONFIG)
 
     @property
     def snmp_handler(self):
