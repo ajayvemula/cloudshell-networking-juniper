@@ -18,8 +18,10 @@ class GenericPort(object):
     """
     PORTCHANNEL_DESCRIPTIONS = ['ae']
     PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
-    _IF_CHASSIS_TABLE = None
-    _IF_MIB_TABLE = None
+
+    JUNIPER_IF_MIB = 'JUNIPER-IF-MIB'
+    IF_MIB = 'IF-MIB'
+    ETHERLIKE_MIB = 'EtherLike-MIB'
 
     def __init__(self, index, snmp_handler):
         """
@@ -48,59 +50,37 @@ class GenericPort(object):
         overridden_config = override_attributes_from_config(GenericPort)
         self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
 
-    @property
-    def if_chassis_table(self):
-        if not GenericPort._IF_CHASSIS_TABLE:
-            GenericPort._IF_CHASSIS_TABLE = self._snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisTable'))
-        return GenericPort._IF_CHASSIS_TABLE
-
-    @property
-    def if_mib_table(self):
-        if not GenericPort._IF_MIB_TABLE:
-            GenericPort._IF_MIB_TABLE = self._snmp_handler.snmp_request(('IF-MIB', 'interfaces'))
-        return GenericPort._IF_MIB_TABLE
-
-    @property
-    def if_chassis_data(self):
-        if not self._if_chassis_data:
-            self._if_chassis_data = self.if_chassis_table[self.index]
-        return self._if_chassis_data
-
-    @property
-    def if_mib_data(self):
-        if not self._if_mib_data:
-            self._if_mib_data = self.if_mib_table[self.index]
-        return self._if_mib_data
-
-    @property
-    def if_duplex_table(self):
-        if not self._if_duplex_table:
-            self._if_duplex_table = self._snmp_handler.snmp_request(('EtherLike-MIB', 'dot3StatsDuplexStatus'))
-        return self._if_duplex_table
+    def _get_snmp_attribute(self, mib, snmp_attribute):
+        attr_dict = self._snmp_handler.get_properties(mib, self.index, {snmp_attribute: 'str'}).get(self.index)
+        if attr_dict:
+            attribute_value = attr_dict.get(snmp_attribute)
+        else:
+            attribute_value = None
+        return attribute_value
 
     @property
     def port_phis_id(self):
-        return self.if_chassis_data.get('ifChassisPort')
+        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPort')
 
     @property
     def port_description(self):
-        return self.if_mib_data.get('ifDescr')
+        return self._get_snmp_attribute(self.IF_MIB, 'ifDescr')
 
     @property
     def logical_unit(self):
-        return self.if_chassis_data.get('ifChassisLogicalUnit')
+        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisLogicalUnit')
 
     @property
     def fpc_id(self):
-        return self.if_chassis_data.get('ifChassisFpc')
+        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisFpc')
 
     @property
     def pic_id(self):
-        return self.if_chassis_data.get('ifChassisPic')
+        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPic')
 
     @property
     def type(self):
-        return self.if_mib_data.get('ifType').strip('\'')
+        return self._get_snmp_attribute(self.IF_MIB, 'ifType').strip('\'')
 
     @property
     def name(self):
@@ -121,8 +101,9 @@ class GenericPort(object):
 
     def _get_port_duplex(self):
         duplex = None
-        if self.index in self.if_duplex_table:
-            port_duplex = self.if_duplex_table[self.index]['dot3StatsDuplexStatus'].strip('\'')
+        snmp_result = self._get_snmp_attribute(self.ETHERLIKE_MIB, 'dot3StatsDuplexStatus')
+        if snmp_result:
+            port_duplex = snmp_result.strip('\'')
             if re.search(r'[Ff]ull', port_duplex):
                 duplex = 'Full'
             else:
@@ -144,14 +125,14 @@ class GenericPort(object):
         """
         port = Port(self.port_phis_id, self.name)
         port_attributes = dict()
-        port_attributes[PortAttributes.PORT_DESCRIPTION] = self.if_mib_data.get('ifDescr')
+        port_attributes[PortAttributes.PORT_DESCRIPTION] = self.port_description
         port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
-        port_attributes[PortAttributes.MAC_ADDRESS] = self.if_mib_data.get('ifPhysAddress')
-        port_attributes[PortAttributes.MTU] = self.if_mib_data.get('ifMtu')
-        port_attributes[PortAttributes.BANDWIDTH] = self.if_mib_data.get('ifSpeed')
+        port_attributes[PortAttributes.MAC_ADDRESS] = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
+        port_attributes[PortAttributes.MTU] = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
+        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifSpeed')
         port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_attributes[PortAttributes.PROTOCOL_TYPE] = self.if_mib_data.get('protoType')
+        port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
         port_attributes[PortAttributes.DUPLEX] = self._get_port_duplex()
         port_attributes[PortAttributes.AUTO_NEGOTIATION] = self._get_port_autoneg()
         port_attributes[PortAttributes.ADJACENT] = self._get_port_adjacent()
@@ -168,7 +149,8 @@ class GenericPort(object):
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
         port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_channel_attributes[PortChannelAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = self.if_mib_data.get('protoType')
+        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB,
+                                                                                                'protoType')
         port_channel_attributes[PortChannelAttributes.ASSOCIATED_PORTS] = ','.join(self.associated_port_names)
         port_channel.build_attributes(port_channel_attributes)
         return port_channel
@@ -178,11 +160,13 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     """
     Load inventory by snmp and build device elements and attributes
     """
-    FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap']
+    FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap', 'fxp']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
     SUPPORTED_OS = [r'[Jj]uniper']
 
     def __init__(self, snmp_handler=None, logger=None, config=None):
+        self._content_indexes = None
+        self._if_indexes = None
         self._logger = logger
         self._snmp_handler = None
         self.snmp_handler = snmp_handler
@@ -312,6 +296,29 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         root_attributes[RootAttributes.MODEL] = model
         self._root.build_attributes(root_attributes)
 
+    def _get_content_indexes(self):
+        container_indexes = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsContainerIndex'))
+        content_indexes = {}
+        for index, value in container_indexes.iteritems():
+            ct_index = value['jnxContentsContainerIndex']
+            if ct_index in content_indexes:
+                content_indexes[ct_index].append(index)
+            else:
+                content_indexes[ct_index] = [index]
+        return content_indexes
+
+    @property
+    def content_indexes(self):
+        if not self._content_indexes:
+            self._content_indexes = self._get_content_indexes()
+        return self._content_indexes
+
+    @property
+    def if_indexes(self):
+        if not self._if_indexes:
+            self._if_indexes = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisPort')).keys()
+        return self._if_indexes
+
     def _build_chassis(self):
         """
         Build Chassis resources and attributes
@@ -319,11 +326,13 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         """
         self.logger.debug('Building Chassis')
         element_index = '1'
-        content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
-        for key in content_table:
-            index1, index2, index3, index = key.split('.')[:4]
-            if index1 == element_index:
-                content_data = content_table[key]
+        chassis_snmp_attributes = {'jnxContentsModel': 'str', 'jnxContentsType': 'str', 'jnxContentsSerialNo': 'str',
+                                   'jnxContentsChassisId': 'str'}
+        if element_index in self.content_indexes:
+            for index in self.content_indexes[element_index]:
+                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index, chassis_snmp_attributes).get(
+                    index)
+                index1, index2, index3, index4 = index.split('.')[:4]
                 chassis_id = index2
                 chassis = Chassis(chassis_id)
 
@@ -340,12 +349,15 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         :return:
         """
         self.logger.debug('Building PowerPorts')
+        power_modules_snmp_attributes = {'jnxContentsModel': 'str', 'jnxContentsType': 'str', 'jnxContentsDescr': 'str',
+                                         'jnxContentsSerialNo': 'str', 'jnxContentsRevision': 'str',
+                                         'jnxContentsChassisId': 'str'}
         element_index = '2'
-        content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
-        for key in content_table:
-            index1, index2, index3, index = key.split('.')[:4]
-            if index1 == element_index:
-                content_data = content_table[key]
+        if element_index in self.content_indexes:
+            for index in self.content_indexes[element_index]:
+                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                                                                power_modules_snmp_attributes).get(index)
+                index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
                 element = PowerPort(element_id)
 
@@ -366,12 +378,17 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         :return:
         """
         self.logger.debug('Building Modules')
+        modules_snmp_attributes = {'jnxContentsModel': 'str',
+                                   'jnxContentsType': 'str',
+                                   'jnxContentsSerialNo': 'str',
+                                   'jnxContentsRevision': 'str',
+                                   'jnxContentsChassisId': 'str'}
         element_index = '7'
-        content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
-        for key in content_table:
-            index1, index2, index3, index = key.split('.')[:4]
-            if index1 == str(element_index):
-                content_data = content_table[key]
+        if element_index in self.content_indexes:
+            for index in self.content_indexes[element_index]:
+                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                                                                modules_snmp_attributes).get(index)
+                index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
                 element = Module(element_id)
 
@@ -392,12 +409,17 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         :return:
         """
         self.logger.debug('Building Sub Modules')
+        sub_modules_snmp_attributes = {'jnxContentsModel': 'str',
+                                       'jnxContentsType': 'str',
+                                       'jnxContentsSerialNo': 'str',
+                                       'jnxContentsRevision': 'str'}
+
         element_index = '8'
-        content_table = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsTable'))
-        for key in content_table:
-            index1, index2, index3, index = key.split('.')[:4]
-            if index1 == str(element_index):
-                content_data = content_table[key]
+        if element_index in self.content_indexes:
+            for index in self.content_indexes[element_index]:
+                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                                                                sub_modules_snmp_attributes).get(index)
+                index1, index2, index3, index4 = index.split('.')[:4]
                 parent_id = index2
                 element_id = index3
                 element = SubModule(element_id)
@@ -423,9 +445,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         :return:
         """
         self.logger.debug("Building generic ports")
-        if_chassis_table = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisTable'))
 
-        for index in if_chassis_table:
+        for index in self.if_indexes:
             index = int(index)
             generic_port = GenericPort(index, self.snmp_handler)
             if not self._port_filtered_by_description(generic_port) and not self._port_filtered_by_type(generic_port):
@@ -555,7 +576,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             :return: True or False
         """
 
-        system_description = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysDescr', 0))
+        system_description = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysDescr', '0'))
         self.logger.debug('Detected system description: \'{0}\''.format(system_description))
         result = re.search(r"({0})".format("|".join(self._supported_os)),
                            system_description,
