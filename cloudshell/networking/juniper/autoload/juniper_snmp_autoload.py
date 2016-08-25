@@ -31,14 +31,15 @@ class GenericPort(object):
         :return:
         """
         self.associated_port_names = []
-        self._if_chassis_data = None
-        self._if_mib_data = None
         self.index = index
         self._snmp_handler = snmp_handler
 
-        self._ipv4_table = None
-        self._ipv6_table = None
-        self._if_duplex_table = None
+        self._port_phis_id = None
+        self._port_description = None
+        self._logical_unit = None
+        self._fpc_id = None
+        self._pic_id = None
+        self._type = None
 
         self.ipv4_addresses = []
         self.ipv6_addresses = []
@@ -60,27 +61,39 @@ class GenericPort(object):
 
     @property
     def port_phis_id(self):
-        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPort')
+        if not self._port_phis_id:
+            self._port_phis_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPort')
+        return self._port_phis_id
 
     @property
     def port_description(self):
-        return self._get_snmp_attribute(self.IF_MIB, 'ifDescr')
+        if not self._port_description:
+            self._port_description = self._get_snmp_attribute(self.IF_MIB, 'ifDescr')
+        return self._port_description
 
     @property
     def logical_unit(self):
-        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisLogicalUnit')
+        if not self._logical_unit:
+            self._logical_unit = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisLogicalUnit')
+        return self._logical_unit
 
     @property
     def fpc_id(self):
-        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisFpc')
+        if not self._fpc_id:
+            self._fpc_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisFpc')
+        return self._fpc_id
 
     @property
     def pic_id(self):
-        return self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPic')
+        if not self._pic_id:
+            self._pic_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPic')
+        return self._pic_id
 
     @property
     def type(self):
-        return self._get_snmp_attribute(self.IF_MIB, 'ifType').strip('\'')
+        if not self._type:
+            self._type = self._get_snmp_attribute(self.IF_MIB, 'ifType').strip('\'')
+        return self._type
 
     @property
     def name(self):
@@ -208,7 +221,6 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     @snmp_handler.setter
     def snmp_handler(self, snmp_handler):
         if snmp_handler:
-            snmp_handler.snmp_request = self.snmp_request
             self._snmp_handler = snmp_handler
             self._initialize_snmp_handler()
 
@@ -216,14 +228,14 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     def ipv4_table(self):
         if not self._ipv4_table:
             self._ipv4_table = sort_elements_by_attributes(
-                self._snmp_handler.snmp_request(('IP-MIB', 'ipAddrTable')), 'ipAdEntIfIndex')
+                self._snmp_handler.walk(('IP-MIB', 'ipAddrTable')), 'ipAdEntIfIndex')
         return self._ipv4_table
 
     @property
     def ipv6_table(self):
         if not self._ipv6_table:
             self._ipv6_table = sort_elements_by_attributes(
-                self._snmp_handler.snmp_request(('IPV6-MIB', 'ipv6AddrEntry')), 'ipAdEntIfIndex')
+                self._snmp_handler.walk(('IPV6-MIB', 'ipv6AddrEntry')), 'ipAdEntIfIndex')
         return self._ipv6_table
 
     @property
@@ -241,15 +253,6 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             for index, generic_port in self._logical_generic_ports.iteritems():
                 self._generic_logical_ports_by_description[generic_port.port_description] = generic_port
         return self._generic_logical_ports_by_description
-
-    def snmp_request(self, request_data):
-        if len(request_data) == 2:
-            result = self.snmp_handler.walk(request_data)
-        elif len(request_data) > 2:
-            result = self.snmp_handler.get_property(*request_data)
-        else:
-            raise Exception('_snmp_request', 'Request tuple len has to be 2 or more')
-        return result
 
     def _initialize_snmp_handler(self):
         """
@@ -277,27 +280,27 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         vendor = ''
         model = ''
         os_version = ''
-        sys_obj_id = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysObjectID', 0))
+        sys_obj_id = self.snmp_handler.get_property('SNMPv2-MIB', 'sysObjectID', 0)
         model_search = re.search('^(?P<vendor>\w+)-\S+jnxProductName(?P<model>\S+)', sys_obj_id
                                  )
         if model_search:
             vendor = model_search.groupdict()['vendor'].capitalize()
             model = model_search.groupdict()['model']
-        sys_descr = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysDescr', '0'))
+        sys_descr = self.snmp_handler.get_property('SNMPv2-MIB', 'sysDescr', '0')
         os_version_search = re.search('JUNOS \S+(,)?\s', sys_descr, re.IGNORECASE)
         if os_version_search:
             os_version = os_version_search.group(0).replace('JUNOS ', '').replace(',', '').strip(' \t\n\r')
         root_attributes = dict()
-        root_attributes[RootAttributes.CONTACT_NAME] = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysContact', '0'))
-        root_attributes[RootAttributes.SYSTEM_NAME] = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysName', '0'))
-        root_attributes[RootAttributes.LOCATION] = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysLocation', '0'))
+        root_attributes[RootAttributes.CONTACT_NAME] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysContact', '0')
+        root_attributes[RootAttributes.SYSTEM_NAME] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysName', '0')
+        root_attributes[RootAttributes.LOCATION] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysLocation', '0')
         root_attributes[RootAttributes.OS_VERSION] = os_version
         root_attributes[RootAttributes.VENDOR] = vendor
         root_attributes[RootAttributes.MODEL] = model
         self._root.build_attributes(root_attributes)
 
     def _get_content_indexes(self):
-        container_indexes = self.snmp_handler.snmp_request(('JUNIPER-MIB', 'jnxContentsContainerIndex'))
+        container_indexes = self.snmp_handler.walk(('JUNIPER-MIB', 'jnxContentsContainerIndex'))
         content_indexes = {}
         for index, value in container_indexes.iteritems():
             ct_index = value['jnxContentsContainerIndex']
@@ -316,7 +319,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     @property
     def if_indexes(self):
         if not self._if_indexes:
-            self._if_indexes = self.snmp_handler.snmp_request(('JUNIPER-IF-MIB', 'ifChassisPort')).keys()
+            self._if_indexes = self.snmp_handler.walk(('JUNIPER-IF-MIB', 'ifChassisPort')).keys()
         return self._if_indexes
 
     def _build_chassis(self):
@@ -341,7 +344,9 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 chassis_attributes[ChassisAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 chassis.build_attributes(chassis_attributes)
                 self._root.chassis.append(chassis)
-                self._chassis[content_data.get('jnxContentsChassisId')] = chassis
+                chassis_id_str = content_data.get('jnxContentsChassisId')
+                if chassis_id_str:
+                    self._chassis[chassis_id_str.strip('\'')] = chassis
 
     def _build_power_modules(self):
         """
@@ -367,10 +372,11 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 element_attributes[PowerPortAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 element_attributes[PowerPortAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
-                chassis_id = content_data.get('jnxContentsChassisId')
-                if chassis_id in self._chassis:
-                    chassis = self._chassis[chassis_id]
-                    chassis.power_ports.append(element)
+                chassis_id_str = content_data.get('jnxContentsChassisId')
+                if chassis_id_str:
+                    chassis = self._chassis.get(chassis_id_str.strip('\''))
+                    if chassis:
+                        chassis.power_ports.append(element)
 
     def _build_modules(self):
         """
@@ -397,11 +403,12 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 element_attributes[ModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
                 element_attributes[ModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
                 element.build_attributes(element_attributes)
-                chassis_id = content_data.get('jnxContentsChassisId')
-                if chassis_id in self._chassis:
-                    chassis = self._chassis[chassis_id]
-                    chassis.modules.append(element)
-                    self._modules[element_id] = element
+                chassis_id_str = content_data.get('jnxContentsChassisId')
+                if chassis_id_str:
+                    chassis = self._chassis.get(chassis_id_str.strip('\''))
+                    if chassis:
+                        chassis.modules.append(element)
+                        self._modules[element_id] = element
 
     def _build_sub_modules(self):
         """
@@ -489,7 +496,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         :return:
         """
         self.logger.debug("Associate portchannels")
-        snmp_data = self._snmp_handler.snmp_request(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
+        snmp_data = self._snmp_handler.walk(('IEEE8023-LAG-MIB', 'dot3adAggPortAttachedAggID'))
         for port_index in snmp_data:
             port_index = int(port_index)
             if port_index in self._logical_generic_ports:
@@ -576,7 +583,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             :return: True or False
         """
 
-        system_description = self.snmp_handler.snmp_request(('SNMPv2-MIB', 'sysDescr', '0'))
+        system_description = self.snmp_handler.get_property('SNMPv2-MIB', 'sysDescr', '0')
         self.logger.debug('Detected system description: \'{0}\''.format(system_description))
         result = re.search(r"({0})".format("|".join(self._supported_os)),
                            system_description,
