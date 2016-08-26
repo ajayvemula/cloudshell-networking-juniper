@@ -52,12 +52,7 @@ class GenericPort(object):
         self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
 
     def _get_snmp_attribute(self, mib, snmp_attribute):
-        attr_dict = self._snmp_handler.get_properties(mib, self.index, {snmp_attribute: 'str'}).get(self.index)
-        if attr_dict:
-            attribute_value = attr_dict.get(snmp_attribute)
-        else:
-            attribute_value = None
-        return attribute_value
+        return self._snmp_handler.get_property(mib, snmp_attribute, self.index)
 
     @property
     def port_phis_id(self):
@@ -105,12 +100,10 @@ class GenericPort(object):
         return port_name
 
     def _get_associated_ipv4_address(self):
-        if len(self.ipv4_addresses) > 0:
-            return ','.join(self.ipv4_addresses)
+        return ','.join(self.ipv4_addresses)
 
     def _get_associated_ipv6_address(self):
-        if len(self.ipv6_addresses) > 0:
-            return ','.join(self.ipv6_addresses)
+        return ','.join(self.ipv6_addresses)
 
     def _get_port_duplex(self):
         duplex = None

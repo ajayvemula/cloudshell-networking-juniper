@@ -55,4 +55,5 @@ class JuniperCliService(CliService):
         :return:
         """
         logger.debug('Rollback called')
+        self._enter_configuration_mode(session)
         self._send_command(commit_rollback.ROLLBACK.get_command(), expected_map=expected_map, session=session)
