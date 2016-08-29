@@ -103,10 +103,10 @@ class GenericPort(object):
         return port_name
 
     def _get_associated_ipv4_address(self):
-        return ','.join(self.ipv4_addresses)[:self._max_string_length]
+        return ','.join(self.ipv4_addresses[:self._max_string_length/30])
 
     def _get_associated_ipv6_address(self):
-        return ','.join(self.ipv6_addresses)[:self._max_string_length]
+        return ','.join(self.ipv6_addresses[:self._max_string_length/30])
 
     def _get_port_duplex(self):
         duplex = None
