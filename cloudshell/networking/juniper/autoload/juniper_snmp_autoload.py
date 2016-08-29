@@ -19,6 +19,8 @@ class GenericPort(object):
     PORTCHANNEL_DESCRIPTIONS = ['ae']
     PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
 
+    AUTOLOAD_MAX_STRING_LENGTH = 1000
+
     JUNIPER_IF_MIB = 'JUNIPER-IF-MIB'
     IF_MIB = 'IF-MIB'
     ETHERLIKE_MIB = 'EtherLike-MIB'
@@ -50,6 +52,7 @@ class GenericPort(object):
 
         overridden_config = override_attributes_from_config(GenericPort)
         self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
+        self._max_string_length = overridden_config.AUTOLOAD_MAX_STRING_LENGTH
 
     def _get_snmp_attribute(self, mib, snmp_attribute):
         return self._snmp_handler.get_property(mib, snmp_attribute, self.index)
@@ -100,10 +103,10 @@ class GenericPort(object):
         return port_name
 
     def _get_associated_ipv4_address(self):
-        return ','.join(self.ipv4_addresses)
+        return ','.join(self.ipv4_addresses[:self._max_string_length/30])
 
     def _get_associated_ipv6_address(self):
-        return ','.join(self.ipv6_addresses)
+        return ','.join(self.ipv6_addresses[:self._max_string_length/30])
 
     def _get_port_duplex(self):
         duplex = None
