@@ -19,7 +19,7 @@ class GenericPort(object):
     PORTCHANNEL_DESCRIPTIONS = ['ae']
     PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
 
-    AUTOLOAD_MAX_STRING_LENGTH = 1000
+    AUTOLOAD_MAX_STRING_LENGTH = 100
 
     JUNIPER_IF_MIB = 'JUNIPER-IF-MIB'
     IF_MIB = 'IF-MIB'
@@ -103,10 +103,15 @@ class GenericPort(object):
         return port_name
 
     def _get_associated_ipv4_address(self):
-        return ','.join(self.ipv4_addresses[:self._max_string_length/30])
+        return self._validate_attribute_value(','.join(self.ipv4_addresses))
 
     def _get_associated_ipv6_address(self):
-        return ','.join(self.ipv6_addresses[:self._max_string_length/30])
+        return self._validate_attribute_value(','.join(self.ipv6_addresses))
+
+    def _validate_attribute_value(self, attribute_value):
+        if len(attribute_value) > self._max_string_length:
+            attribute_value = attribute_value[:self._max_string_length] + '...'
+        return attribute_value
 
     def _get_port_duplex(self):
         duplex = None
