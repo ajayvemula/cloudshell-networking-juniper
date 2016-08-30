@@ -1,3 +1,5 @@
+from copy import copy
+
 from cloudshell.cli.service.cli_exceptions import CommandExecutionException
 from cloudshell.cli.service.cli_service import CliService
 from cloudshell.configuration.cloudshell_cli_binding_keys import SESSION
@@ -7,7 +9,6 @@ import inject
 
 
 class JuniperCliService(CliService):
-
     @inject.params(logger=LOGGER, session=SESSION)
     def send_config_command(self, command, expected_str=None, expected_map=None, error_map=None, logger=None,
                             session=None, **optional_args):
@@ -27,7 +28,7 @@ class JuniperCliService(CliService):
                                                                       logger, session, **optional_args)
         except CommandExecutionException:
             self.rollback()
-            raise 
+            raise
 
     @inject.params(logger=LOGGER, session=SESSION)
     def commit(self, expected_map=None, logger=None, session=None):
@@ -39,8 +40,11 @@ class JuniperCliService(CliService):
         :return:
         """
         logger.debug('Commit called')
+        error_map = copy(self._error_map)
+        error_map[r'[Ee]rror|ERROR'] = 'Commit error, see logs for more details'
         try:
-            self._send_command(commit_rollback.COMMIT.get_command(), expected_map=expected_map, session=session)
+            self._send_command(commit_rollback.COMMIT.get_command(), expected_map=expected_map, error_map=error_map,
+                               session=session)
         except CommandExecutionException:
             self.rollback()
             raise
