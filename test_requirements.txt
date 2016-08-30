@@ -1,0 +1,9 @@
+nose
+coverage
+unittest2
+mock
+teamcity-messages
+jsonpickle
+nose-exclude
+inject
+cloudshell-snmp>=2.1,<2.2
