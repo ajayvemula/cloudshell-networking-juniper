@@ -12,7 +12,7 @@ from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
 from cloudshell.configuration.cloudshell_cli_binding_keys import CLI_SERVICE
 from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, CONFIG
 from cloudshell.shell.core.context_utils import get_attribute_by_name
-
+from cloudshell.networking.juniper.command_templates import enable_disable_snmp
 
 class GenericPort(object):
     """
@@ -228,10 +228,11 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                               "Trying to add it".format(self.snmp_community))
 
             self.cli_service.send_command_list([
-                'edit snmp',
-                'set community "{}" authorization read-only'.format(self.snmp_community)])
+                enable_disable_snmp.EDIT_SNMP.get_command(),
+                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community)])
 
             self.cli_service.commit()
+            self.cli_service.exit_configuration_mode()
             self.logger.debug("SNMP community string '{}' was added to the the device.".format(self.snmp_community))
 
     def disable_snmp(self):
@@ -240,7 +241,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         NOTE: this will work only for devices with Junos OS
         """
         self.logger.debug("Trying to delete SNMP configuration from the device")
-        self.cli_service.send_config_command('delete snmp')
+        self.cli_service.send_config_command(enable_disable_snmp.DISABLE_SNMP.get_command())
         self.cli_service.commit()
         self.logger.debug("SNMP configuration was successfully deleted from the device")
 
@@ -663,9 +664,6 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         Call methods in specific order to build resources and attributes
         :return:
         """
-        if not self._is_valid_device_os():
-            raise Exception(self.__class__.__name__, 'Unsupported device OS')
-
         try:
             enable_snmp = get_attribute_by_name('Enable SNMP').lower() == 'true'
             disable_snmp = get_attribute_by_name('Disable SNMP').lower() == 'true'
@@ -675,6 +673,9 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
 
         if enable_snmp:
             self.enable_snmp()
+
+        if not self._is_valid_device_os():
+            raise Exception(self.__class__.__name__, 'Unsupported device OS')
 
         try:
             self._build_root()
