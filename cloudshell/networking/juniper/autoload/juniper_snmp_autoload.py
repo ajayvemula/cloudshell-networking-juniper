@@ -9,8 +9,10 @@ import re
 import os
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
 from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
+from cloudshell.configuration.cloudshell_cli_binding_keys import CLI_SERVICE
 from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, CONFIG
-
+from cloudshell.shell.core.context_utils import get_attribute_by_name
+from cloudshell.networking.juniper.command_templates import enable_disable_snmp
 
 class GenericPort(object):
     """
@@ -178,13 +180,15 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
     SUPPORTED_OS = [r'[Jj]uniper']
 
-    def __init__(self, snmp_handler=None, logger=None, config=None):
+    def __init__(self, snmp_handler=None, logger=None, config=None, cli_service=None, snmp_community=None):
         self._content_indexes = None
         self._if_indexes = None
         self._logger = logger
         self._snmp_handler = None
         self.snmp_handler = snmp_handler
         self._config = config
+        self._cli_service = cli_service
+        self._snmp_community = snmp_community
 
         self._logical_generic_ports = {}
         self._physical_generic_ports = {}
@@ -206,6 +210,43 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._supported_os = overridden_config.SUPPORTED_OS
 
     @property
+    def snmp_community(self):
+        if self._snmp_community is None:
+            self._snmp_community = get_attribute_by_name("SNMP Read Community") or "quali"
+        return self._snmp_community
+
+    def enable_snmp(self):
+        """Enable SNMP Agent on the device and configure community string if needed
+
+        NOTE: this will work only for devices with Junos OS
+        """
+        snmp_community_info = self.cli_service.send_config_command('show snmp community "{}"'
+                                                                   .format(self.snmp_community))
+
+        if "authorization read" not in snmp_community_info:
+            self.logger.debug("SNMP community string '{}' is not present on the device. "
+                              "Trying to add it".format(self.snmp_community))
+
+            self.cli_service.send_command_list([
+                enable_disable_snmp.ENTER_EDIT_SNMP.get_command(),
+                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community),
+                enable_disable_snmp.EXIT_EDIT_SNMP.get_command(),
+            ])
+
+            self.cli_service.commit()
+            self.logger.debug("SNMP community string '{}' was added to the the device.".format(self.snmp_community))
+
+    def disable_snmp(self):
+        """Disable SNMP Agent on the device
+
+        NOTE: this will work only for devices with Junos OS
+        """
+        self.logger.debug("Trying to delete SNMP configuration from the device")
+        self.cli_service.send_config_command(enable_disable_snmp.DISABLE_SNMP.get_command())
+        self.cli_service.commit()
+        self.logger.debug("SNMP configuration was successfully deleted from the device")
+
+    @property
     def logger(self):
         return self._logger or inject.instance(LOGGER)
 
@@ -224,6 +265,10 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         if snmp_handler:
             self._snmp_handler = snmp_handler
             self._initialize_snmp_handler()
+
+    @property
+    def cli_service(self):
+        return self._cli_service or inject.instance(CLI_SERVICE)
 
     @property
     def ipv4_table(self):
@@ -620,14 +665,30 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         Call methods in specific order to build resources and attributes
         :return:
         """
+        try:
+            enable_snmp = get_attribute_by_name('Enable SNMP').lower() == 'true'
+            disable_snmp = get_attribute_by_name('Disable SNMP').lower() == 'true'
+        except Exception:
+            enable_snmp = True
+            disable_snmp = False
+
+        if enable_snmp:
+            self.enable_snmp()
+
         if not self._is_valid_device_os():
             raise Exception(self.__class__.__name__, 'Unsupported device OS')
-        self._build_root()
-        self._build_chassis()
-        self._build_power_modules()
-        self._build_modules()
-        self._build_sub_modules()
-        self._build_ports()
-        autoload_details = self._root.get_autoload_details()
-        self._log_autoload_details(autoload_details)
+
+        try:
+            self._build_root()
+            self._build_chassis()
+            self._build_power_modules()
+            self._build_modules()
+            self._build_sub_modules()
+            self._build_ports()
+            autoload_details = self._root.get_autoload_details()
+            self._log_autoload_details(autoload_details)
+        finally:
+            if disable_snmp:
+                self.disable_snmp()
+
         return autoload_details

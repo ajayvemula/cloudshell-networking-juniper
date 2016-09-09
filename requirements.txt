@@ -1,1 +1,2 @@
-cloudshell-networking>=2.1,<2.2
+cloudshell-cli>=2.1,<2.2
+cloudshell-networking>=3.0,<3.1
