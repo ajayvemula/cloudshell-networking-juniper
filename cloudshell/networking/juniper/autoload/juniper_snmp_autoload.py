@@ -228,11 +228,12 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                               "Trying to add it".format(self.snmp_community))
 
             self.cli_service.send_command_list([
-                enable_disable_snmp.EDIT_SNMP.get_command(),
-                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community)])
+                enable_disable_snmp.ENTER_EDIT_SNMP.get_command(),
+                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community),
+                enable_disable_snmp.EXIT_EDIT_SNMP.get_command(),
+            ])
 
             self.cli_service.commit()
-            self.cli_service.exit_configuration_mode()
             self.logger.debug("SNMP community string '{}' was added to the the device.".format(self.snmp_community))
 
     def disable_snmp(self):
