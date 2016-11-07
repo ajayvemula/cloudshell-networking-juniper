@@ -26,6 +26,7 @@ class GenericPort(object):
     JUNIPER_IF_MIB = 'JUNIPER-IF-MIB'
     IF_MIB = 'IF-MIB'
     ETHERLIKE_MIB = 'EtherLike-MIB'
+    LLDP_MIB = 'LLDP-MIB'
 
     def __init__(self, index, snmp_handler):
         """
@@ -132,7 +133,9 @@ class GenericPort(object):
         return None
 
     def _get_port_adjacent(self):
-        return None
+        rem_port_descr = self._get_snmp_attribute(self.LLDP_MIB, 'lldpRemPortId')
+        rem_sys_descr = self._get_snmp_attribute(self.LLDP_MIB, 'lldpRemSysDesc')
+        return '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
 
     def get_port(self):
         """
@@ -316,6 +319,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.snmp_handler.load_mib('EtherLike-MIB')
         self.snmp_handler.load_mib('IP-MIB')
         self.snmp_handler.load_mib('IPV6-MIB')
+        self.snmp_handler.load_mib('LLDP-MIB')
 
     def _build_root(self):
         """
