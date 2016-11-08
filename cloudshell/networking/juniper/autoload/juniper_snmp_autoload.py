@@ -14,6 +14,7 @@ from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, 
 from cloudshell.shell.core.context_utils import get_attribute_by_name
 from cloudshell.networking.juniper.command_templates import enable_disable_snmp
 
+
 class GenericPort(object):
     """
     Collect information and build Port or PortChannel
@@ -305,16 +306,16 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         keys = self.snmp_handler.walk(('LLDP-MIB', 'lldpRemPortId')).keys()
         for key in keys:
             key_splited = str(key).split('.')
-            if len(key_splited)==3:
-                result_dict[key_splited[1]]=key
-            elif len(key_splited)==1:
-                result_dict[key_splited[0]]=key
+            if len(key_splited) == 3:
+                result_dict[key_splited[1]] = key
+            elif len(key_splited) == 1:
+                result_dict[key_splited[0]] = key
         return result_dict
 
     @property
     def lldp_keys(self):
         if not self._lldp_keys:
-            self._lldp_keys=self._build_lldp_keys()
+            self._lldp_keys = self._build_lldp_keys()
         return self._lldp_keys
 
     def _initialize_snmp_handler(self):
@@ -580,7 +581,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             if int(index) in self._logical_generic_ports:
                 rem_port_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemPortDesc', self.lldp_keys[index])
                 rem_sys_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemSysDesc', self.lldp_keys[index])
-                physical_port = self._get_associated_phisical_port_by_description(self._logical_generic_ports[int(index)].port_description)
+                physical_port = self._get_associated_phisical_port_by_description(
+                    self._logical_generic_ports[int(index)].port_description)
                 physical_port.port_adjacent = '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
 
     def _get_associated_phisical_port_by_description(self, description):
