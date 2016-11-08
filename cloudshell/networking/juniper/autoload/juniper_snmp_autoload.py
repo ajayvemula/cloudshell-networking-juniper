@@ -14,6 +14,7 @@ from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, 
 from cloudshell.shell.core.context_utils import get_attribute_by_name
 from cloudshell.networking.juniper.command_templates import enable_disable_snmp
 
+
 class GenericPort(object):
     """
     Collect information and build Port or PortChannel
@@ -47,6 +48,8 @@ class GenericPort(object):
 
         self.ipv4_addresses = []
         self.ipv6_addresses = []
+        self.port_adjacent = None
+
         if self.port_description[:2] in self.PORTCHANNEL_DESCRIPTIONS:
             self.is_portchannel = True
         else:
@@ -131,9 +134,6 @@ class GenericPort(object):
         # return auto_negotiation
         return None
 
-    def _get_port_adjacent(self):
-        return None
-
     def get_port(self):
         """
         Build Port instance using collected information
@@ -151,7 +151,7 @@ class GenericPort(object):
         port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
         port_attributes[PortAttributes.DUPLEX] = self._get_port_duplex()
         port_attributes[PortAttributes.AUTO_NEGOTIATION] = self._get_port_autoneg()
-        port_attributes[PortAttributes.ADJACENT] = self._get_port_adjacent()
+        port_attributes[PortAttributes.ADJACENT] = self.port_adjacent
         port.build_attributes(port_attributes)
         return port
 
@@ -204,6 +204,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._ipv6_table = None
         self._if_duplex_table = None
         self._autoneg = None
+        self._lldp_keys = None
 
         """Override attributes from global config"""
         overridden_config = override_attributes_from_config(JuniperSnmpAutoload, config=self.config)
@@ -300,6 +301,23 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 self._generic_logical_ports_by_description[generic_port.port_description] = generic_port
         return self._generic_logical_ports_by_description
 
+    def _build_lldp_keys(self):
+        result_dict = {}
+        keys = self.snmp_handler.walk(('LLDP-MIB', 'lldpRemPortId')).keys()
+        for key in keys:
+            key_splited = str(key).split('.')
+            if len(key_splited) == 3:
+                result_dict[key_splited[1]] = key
+            elif len(key_splited) == 1:
+                result_dict[key_splited[0]] = key
+        return result_dict
+
+    @property
+    def lldp_keys(self):
+        if not self._lldp_keys:
+            self._lldp_keys = self._build_lldp_keys()
+        return self._lldp_keys
+
     def _initialize_snmp_handler(self):
         """
         Snmp settings and load specific mibs
@@ -316,6 +334,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.snmp_handler.load_mib('EtherLike-MIB')
         self.snmp_handler.load_mib('IP-MIB')
         self.snmp_handler.load_mib('IPV6-MIB')
+        self.snmp_handler.load_mib('LLDP-MIB')
 
     def _build_root(self):
         """
@@ -557,6 +576,15 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                         if associated_phisical_port:
                             associated_phisical_portchannel.associated_port_names.append(associated_phisical_port.name)
 
+    def _associate_adjacent(self):
+        for index in self.lldp_keys:
+            if int(index) in self._logical_generic_ports:
+                rem_port_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemPortDesc', self.lldp_keys[index])
+                rem_sys_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemSysDesc', self.lldp_keys[index])
+                physical_port = self._get_associated_phisical_port_by_description(
+                    self._logical_generic_ports[int(index)].port_description)
+                physical_port.port_adjacent = '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
+
     def _get_associated_phisical_port_by_description(self, description):
         """
         Associate physical port by description
@@ -599,6 +627,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._associate_ipv4_addresses()
         self._associate_ipv6_addresses()
         self._associate_portchannels()
+        self._associate_adjacent()
         for generic_port in self._physical_generic_ports.values():
             if generic_port.is_portchannel:
                 self._root.port_channels.append(generic_port.get_portchannel())
