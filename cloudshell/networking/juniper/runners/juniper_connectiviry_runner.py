@@ -1,7 +1,7 @@
 from cloudshell.networking.devices.runners.connectivity_runner import ConnectivityRunner
 from cloudshell.networking.juniper.flows.juniper_add_vlan_flow import JuniperAddVlanFlow
 from cloudshell.networking.juniper.flows.juniper_remove_vlan_flow import JuniperRemoveVlanFlow
-from cloudshell.networking.juniper.juniper_cli_handler import JuniperCliHandler
+from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 
 
 class JuniperConnectivityRunner(ConnectivityRunner):

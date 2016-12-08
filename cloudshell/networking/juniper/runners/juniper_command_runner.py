@@ -1,0 +1,2 @@
+class JuniperCommandRunner(CommandRunner):
+    pass
