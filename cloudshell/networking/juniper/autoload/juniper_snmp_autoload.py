@@ -579,11 +579,17 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     def _associate_adjacent(self):
         for index in self.lldp_keys:
             if int(index) in self._logical_generic_ports:
-                rem_port_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemPortDesc', self.lldp_keys[index])
-                rem_sys_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemSysDesc', self.lldp_keys[index])
                 physical_port = self._get_associated_phisical_port_by_description(
                     self._logical_generic_ports[int(index)].port_description)
-                physical_port.port_adjacent = '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
+                self._set_adjacent(index, physical_port)
+            elif int(index) in self._physical_generic_ports:
+                physical_port = self._physical_generic_ports[int(index)]
+                self._set_adjacent(index, physical_port)
+
+    def _set_adjacent(self, index, port):
+        rem_port_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemPortDesc', self.lldp_keys[index])
+        rem_sys_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemSysDesc', self.lldp_keys[index])
+        port.port_adjacent = '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
 
     def _get_associated_phisical_port_by_description(self, description):
         """
