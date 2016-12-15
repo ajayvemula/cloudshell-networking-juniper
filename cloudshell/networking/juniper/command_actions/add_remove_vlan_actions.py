@@ -8,7 +8,7 @@ class AddRemoveVlanActions(object):
     def __init__(self, cli_service, logger):
         """
         Add remove vlan
-        :param cli_service:
+        :param cli_service: config mode cli_service
         :type cli_service: CliService
         :param logger:
         :type logger: Logger
@@ -45,6 +45,7 @@ class AddRemoveVlanActions(object):
 
         output += CommandTemplateExecutor(self._cli_service, command_template.CONFIGURE_VLAN_QNQ).execute_command(
             vlan_name=vlan_name)
+        self._logger.debug('Set qnq tag for {0}'.format(vlan_name))
         return output
 
     def create_vlan(self, vlan_name, vlan_range):
@@ -57,9 +58,11 @@ class AddRemoveVlanActions(object):
         if re.match(r'\d+-\d+', vlan_range):
             output = CommandTemplateExecutor(self._cli_service, command_template.CREATE_VLAN_RANGE).execute_command(
                 vlan_name=vlan_name, vlan_range=vlan_range)
+            self._logger.debug('Created vlan range {0}, ids {1}'.format(vlan_name, vlan_range))
         else:
             output = CommandTemplateExecutor(self._cli_service, command_template.CREATE_VLAN).execute_command(
                 vlan_name=vlan_name, vlan_id=vlan_range)
+            self._logger.debug('Created vlan {0}, id {1}'.format(vlan_name, vlan_range))
         return output
 
     def delete_vlan(self, vlan_name):
@@ -127,7 +130,7 @@ class AddRemoveVlanActions(object):
         :param port:
         :return:
         """
-        vlans = self.get_vlan_ports(port)
+        vlans = self.get_vlans_for_port(port)
         for vlan_name in vlans:
             self.delete_member(port, vlan_name)
         self.remove_port_mode_on_interface(port)

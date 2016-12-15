@@ -1,4 +1,6 @@
 from cloudshell.cli.command_template.command_template import CommandTemplate
 
-COMMIT = CommandTemplate('commit', [], [])
-ROLLBACK = CommandTemplate('rollback', [], [])
+ERROR_MAP = {r'[Ee]rror:': 'Command error'}
+
+COMMIT = CommandTemplate('commit', error_map=ERROR_MAP)
+ROLLBACK = CommandTemplate('rollback', error_map=ERROR_MAP)
