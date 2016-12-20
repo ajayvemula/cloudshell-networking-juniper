@@ -11,8 +11,8 @@ class JuniperAddVlanFlow(AddVlanFlow):
         vlan_name = "vlan-" + vlan_range
         with self._cli_handler.get_cli_service(self._cli_handler.config_mode) as cli_service:
             commit_rollback_actions = CommitRollbackActions(cli_service, self._logger)
+            vlan_actions = AddRemoveVlanActions(cli_service, self._logger)
             try:
-                vlan_actions = AddRemoveVlanActions(cli_service, self._logger)
                 if qnq:
                     vlan_actions.create_qnq_vlan(vlan_name, vlan_range)
                 else:
