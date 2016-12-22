@@ -5,7 +5,7 @@ from cloudshell.networking.juniper.command_templates import save_restore
 class SaveRestoreActions(object):
     def __init__(self, cli_service, logger):
         """
-        Save restore
+        Save/restore configuration
         :param cli_service: config mode cli_service
         :type cli_service: CliService
         :param logger:
