@@ -1,13 +1,18 @@
 from cloudshell.networking.devices.runners.autoload_runner import AutoloadRunner
-from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
+from cloudshell.networking.juniper.flows.juniper_autoload_flow import JuniperSnmpAutoloadFlow
+from cloudshell.networking.juniper.snmp.juniper_snmp_handler import JuniperSnmpHandler
 
 
 class JuniperAutoloadRunner(AutoloadRunner):
-    def __init__(self, cli, logger, api, context, supported_os):
-        super(JuniperAutoloadRunner, self).__init__(cli, logger, context, supported_os)
-        self._cli_handler = JuniperCliHandler(cli, context, logger, api)
+    def __init__(self, cli, logger, context, api, supported_os):
+        super(JuniperAutoloadRunner, self).__init__(context, supported_os)
+        self._cli = cli
+        self._api = api
         self._logger = logger
-        self._autoload_flow = CiscoAutoloadFlow(cli_handler=self._cli_handler,
-                                                autoload_class=CiscoIOSAutoload,
-                                                logger=logger,
-                                                resource_name=self._resource_name)
+
+    @property
+    def snmp_handler(self):
+        return JuniperSnmpHandler(self._cli, self._context, self._logger, self._api)
+
+    def create_autoload_flow(self):
+        return JuniperSnmpAutoloadFlow(self.snmp_handler, self._logger)

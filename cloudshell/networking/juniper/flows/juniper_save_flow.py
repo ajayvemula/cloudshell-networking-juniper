@@ -1,4 +1,4 @@
-from cloudshell.networking.devices.flows.action_flows import SaveConfigurationFlow
+from cloudshell.networking.devices.flows.cli_action_flows import SaveConfigurationFlow
 from cloudshell.networking.juniper.command_actions.save_restore_actions import SaveRestoreActions
 from cloudshell.networking.juniper.helpers.save_restore_helper import SaveRestoreHelper
 

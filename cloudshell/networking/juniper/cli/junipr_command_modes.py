@@ -56,13 +56,13 @@ class DefaultCommandMode(CommandMode):
         return OrderedDict()
 
     def enter_error_map(self):
-        return OrderedDict()
+        return OrderedDict((r'[Ee]rror:', 'Command error'))
 
     def exit_action_map(self):
         return OrderedDict()
 
     def exit_error_map(self):
-        return OrderedDict()
+        return OrderedDict((r'[Ee]rror:', 'Command error'))
 
 
 class ConfigCommandMode(CommandMode):
@@ -86,13 +86,13 @@ class ConfigCommandMode(CommandMode):
                                  attributes.PASSWORD, self._context)))})
 
     def enter_error_map(self):
-        return OrderedDict()
+        return OrderedDict((r'[Ee]rror:', 'Command error'))
 
     def exit_action_map(self):
         return OrderedDict()
 
     def exit_error_map(self):
-        return OrderedDict()
+        return OrderedDict((r'[Ee]rror:', 'Command error'))
 
 
 CommandMode.RELATIONS_DICT = {
@@ -102,3 +102,15 @@ CommandMode.RELATIONS_DICT = {
         }
     }
 }
+
+
+# Not mandatory modes
+class EditSnmpCommandMode(CommandMode):
+    PROMPT = r'\[edit snmp\]\n.*#\s*$'
+    ENTER_COMMAND = 'edit snmp'
+    EXIT_COMMAND = 'exit'
+
+    def __init__(self):
+        CommandMode.__init__(self, EditSnmpCommandMode.PROMPT,
+                             EditSnmpCommandMode.ENTER_COMMAND,
+                             EditSnmpCommandMode.EXIT_COMMAND)

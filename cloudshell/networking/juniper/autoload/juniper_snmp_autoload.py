@@ -1,18 +1,15 @@
-from cloudshell.networking.autoload.networking_attributes import RootAttributes, ChassisAttributes, PowerPortAttributes, \
+from cloudshell.networking.devices.autoload.networking_attributes import RootAttributes, ChassisAttributes, \
+    PowerPortAttributes, \
     ModuleAttributes, SubModuleAttributes, PortAttributes, PortChannelAttributes
-from cloudshell.networking.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, PowerPort, \
+from cloudshell.networking.devices.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, \
+    PowerPort, \
     PortChannel
-from cloudshell.networking.operations.interfaces.autoload_operations_interface import AutoloadOperationsInterface
-from cloudshell.shell.core.config_utils import override_attributes_from_config
-import inject
+from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemoveVlanHelper
+
 import re
 import os
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
-from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
-from cloudshell.configuration.cloudshell_cli_binding_keys import CLI_SERVICE
-from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, CONFIG
-from cloudshell.shell.core.context_utils import get_attribute_by_name
-from cloudshell.networking.juniper.command_templates import enable_disable_snmp
+
 
 class GenericPort(object):
     """
@@ -52,9 +49,8 @@ class GenericPort(object):
         else:
             self.is_portchannel = False
 
-        overridden_config = override_attributes_from_config(GenericPort)
-        self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
-        self._max_string_length = overridden_config.AUTOLOAD_MAX_STRING_LENGTH
+        self._port_name_char_replacement = self.PORT_NAME_CHAR_REPLACEMENT
+        self._max_string_length = self.AUTOLOAD_MAX_STRING_LENGTH
 
     def _get_snmp_attribute(self, mib, snmp_attribute):
         return self._snmp_handler.get_property(mib, snmp_attribute, self.index)
@@ -97,12 +93,7 @@ class GenericPort(object):
 
     @property
     def name(self):
-        return self._convert_port_name(self.port_description)
-
-    def _convert_port_name(self, port_name):
-        for char, replacement in self._port_name_char_replacement.iteritems():
-            port_name = port_name.replace(char, replacement)
-        return port_name
+        return AddRemoveVlanHelper.convert_port_name(self.port_description)
 
     def _get_associated_ipv4_address(self):
         return self._validate_attribute_value(','.join(self.ipv4_addresses))
@@ -172,23 +163,20 @@ class GenericPort(object):
         return port_channel
 
 
-class JuniperSnmpAutoload(AutoloadOperationsInterface):
+class JuniperSnmpAutoload(object):
     """
     Load inventory by snmp and build device elements and attributes
     """
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap', 'fxp']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
-    SUPPORTED_OS = [r'[Jj]uniper']
+    # SUPPORTED_OS = [r'[Jj]uniper']
 
-    def __init__(self, snmp_handler=None, logger=None, config=None, cli_service=None, snmp_community=None):
+    def __init__(self, snmp_handler, logger):
         self._content_indexes = None
         self._if_indexes = None
         self._logger = logger
-        self._snmp_handler = None
-        self.snmp_handler = snmp_handler
-        self._config = config
-        self._cli_service = cli_service
-        self._snmp_community = snmp_community
+        self._snmp_handler = snmp_handler
+        self._initialize_snmp_handler()
 
         self._logical_generic_ports = {}
         self._physical_generic_ports = {}
@@ -205,70 +193,13 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._if_duplex_table = None
         self._autoneg = None
 
-        """Override attributes from global config"""
-        overridden_config = override_attributes_from_config(JuniperSnmpAutoload, config=self.config)
-        self._supported_os = overridden_config.SUPPORTED_OS
-
-    @property
-    def snmp_community(self):
-        if self._snmp_community is None:
-            self._snmp_community = get_attribute_by_name("SNMP Read Community") or "quali"
-        return self._snmp_community
-
-    def enable_snmp(self):
-        """Enable SNMP Agent on the device and configure community string if needed
-
-        NOTE: this will work only for devices with Junos OS
-        """
-        snmp_community_info = self.cli_service.send_config_command('show snmp community "{}"'
-                                                                   .format(self.snmp_community))
-
-        if "authorization read" not in snmp_community_info:
-            self.logger.debug("SNMP community string '{}' is not present on the device. "
-                              "Trying to add it".format(self.snmp_community))
-
-            self.cli_service.send_command_list([
-                enable_disable_snmp.ENTER_EDIT_SNMP.get_command(),
-                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community),
-                enable_disable_snmp.EXIT_EDIT_SNMP.get_command(),
-            ])
-
-            self.cli_service.commit()
-            self.logger.debug("SNMP community string '{}' was added to the the device.".format(self.snmp_community))
-
-    def disable_snmp(self):
-        """Disable SNMP Agent on the device
-
-        NOTE: this will work only for devices with Junos OS
-        """
-        self.logger.debug("Trying to delete SNMP configuration from the device")
-        self.cli_service.send_config_command(enable_disable_snmp.DISABLE_SNMP.get_command())
-        self.cli_service.commit()
-        self.logger.debug("SNMP configuration was successfully deleted from the device")
-
     @property
     def logger(self):
-        return self._logger or inject.instance(LOGGER)
-
-    @property
-    def config(self):
-        return self._config or inject.instance(CONFIG)
+        return self._logger
 
     @property
     def snmp_handler(self):
-        if self._snmp_handler is None:
-            self.snmp_handler = inject.instance(SNMP_HANDLER)
         return self._snmp_handler
-
-    @snmp_handler.setter
-    def snmp_handler(self, snmp_handler):
-        if snmp_handler:
-            self._snmp_handler = snmp_handler
-            self._initialize_snmp_handler()
-
-    @property
-    def cli_service(self):
-        return self._cli_service or inject.instance(CLI_SERVICE)
 
     @property
     def ipv4_table(self):
@@ -624,14 +555,14 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 return pic
         return None
 
-    def _is_valid_device_os(self):
+    def _is_valid_device_os(self, supported_os):
         """Validate device OS using snmp
             :return: True or False
         """
 
         system_description = self.snmp_handler.get_property('SNMPv2-MIB', 'sysDescr', '0')
         self.logger.debug('Detected system description: \'{0}\''.format(system_description))
-        result = re.search(r"({0})".format("|".join(self._supported_os)),
+        result = re.search(r"({0})".format("|".join(supported_os)),
                            system_description,
                            flags=re.DOTALL | re.IGNORECASE)
 
@@ -639,7 +570,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             return True
         else:
             error_message = 'Incompatible driver! Please use this driver for \'{0}\' operation system(s)'. \
-                format(str(tuple(self._supported_os)))
+                format(str(tuple(supported_os)))
             self.logger.error(error_message)
             return False
 
@@ -660,35 +591,21 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                                                         attribute.attribute_value))
         self.logger.debug('-------------------- </ATTRIBUTES> ---------------------')
 
-    def discover(self):
+    def discover(self, supported_os):
         """
         Call methods in specific order to build resources and attributes
         :return:
         """
-        try:
-            enable_snmp = get_attribute_by_name('Enable SNMP').lower() == 'true'
-            disable_snmp = get_attribute_by_name('Disable SNMP').lower() == 'true'
-        except Exception:
-            enable_snmp = True
-            disable_snmp = False
 
-        if enable_snmp:
-            self.enable_snmp()
-
-        if not self._is_valid_device_os():
+        if not self._is_valid_device_os(supported_os):
             raise Exception(self.__class__.__name__, 'Unsupported device OS')
 
-        try:
-            self._build_root()
-            self._build_chassis()
-            self._build_power_modules()
-            self._build_modules()
-            self._build_sub_modules()
-            self._build_ports()
-            autoload_details = self._root.get_autoload_details()
-            self._log_autoload_details(autoload_details)
-        finally:
-            if disable_snmp:
-                self.disable_snmp()
-
+        self._build_root()
+        self._build_chassis()
+        self._build_power_modules()
+        self._build_modules()
+        self._build_sub_modules()
+        self._build_ports()
+        autoload_details = self._root.get_autoload_details()
+        self._log_autoload_details(autoload_details)
         return autoload_details

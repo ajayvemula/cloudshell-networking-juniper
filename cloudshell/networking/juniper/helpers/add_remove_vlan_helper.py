@@ -5,7 +5,13 @@ class AddRemoveVlanHelper(object):
     PORT_NAME_CHAR_REPLACEMENT = OrderedDict([(':', '--'), ('/', '-')])
 
     @staticmethod
-    def convert_port_name(port_name, logger):
+    def convert_port_name(port_name):
+        for char, replacement in AddRemoveVlanHelper.PORT_NAME_CHAR_REPLACEMENT.iteritems():
+            port_name = port_name.replace(char, replacement)
+        return port_name
+
+    @staticmethod
+    def revert_port_name(port_name):
         port_name_splitted = port_name.split('/')[-1].split('-', 1)
         if len(port_name_splitted) == 2:
             port_suffix, port_location = port_name_splitted
@@ -19,7 +25,7 @@ class AddRemoveVlanHelper(object):
         return port_name
 
     @staticmethod
-    def extract_port_name(port, logger):
+    def extract_port_name(port):
         """Get port name from port resource full address
 
         :param port: port resource full address (192.168.1.1/0/34)
@@ -28,5 +34,5 @@ class AddRemoveVlanHelper(object):
         """
 
         port_name = port.split('/')[-1]
-        temp_port_name = AddRemoveVlanHelper.convert_port_name(port_name, logger)
+        temp_port_name = AddRemoveVlanHelper.revert_port_name(port_name)
         return temp_port_name

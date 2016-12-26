@@ -1,8 +1,8 @@
 from collections import OrderedDict
 from cloudshell.cli.command_template.command_template import CommandTemplate
 
-ERROR_MAP = OrderedDict((r'[Ee]rror:', 'Command error'))
-ACTION_MAP = OrderedDict((r'\[[Yy]es,[Nn]o\]', lambda session, logger: session.send_line('yes')))
+ERROR_MAP = OrderedDict([(r'[Ee]rror:', 'Command error')])
+ACTION_MAP = OrderedDict([(r'\[[Yy]es,[Nn]o\]', lambda session, logger: session.send_line('yes'))])
 
 FIRMWARE_UPGRADE = CommandTemplate('request system software add {src_path}', action_map=ACTION_MAP, error_map=ERROR_MAP)
 SHUTDOWN = CommandTemplate('request system power-off')

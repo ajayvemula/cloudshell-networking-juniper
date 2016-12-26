@@ -1,5 +1,5 @@
 import time
-from cloudshell.networking.devices.flows.action_flows import LoadFirmwareFlow
+from cloudshell.networking.devices.flows.cli_action_flows import LoadFirmwareFlow
 from cloudshell.networking.juniper.command_actions.system_actions import SystemActions
 
 
