@@ -24,7 +24,7 @@ class GenericPort(object):
     IF_MIB = 'IF-MIB'
     ETHERLIKE_MIB = 'EtherLike-MIB'
 
-    def __init__(self, index, snmp_handler):
+    def __init__(self, index, snmp_handler, resource_name):
         """
         Create GenericPort with index and snmp handler
         :param index:
@@ -34,6 +34,7 @@ class GenericPort(object):
         self.associated_port_names = []
         self.index = index
         self._snmp_handler = snmp_handler
+        self._resource_name = resource_name
 
         self._port_phis_id = None
         self._port_description = None
@@ -130,7 +131,8 @@ class GenericPort(object):
         Build Port instance using collected information
         :return:
         """
-        port = Port(self.port_phis_id, self.name)
+        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port', self.index)
+        port = Port(self.port_phis_id, self.name, unique_id=unique_id)
         port_attributes = dict()
         port_attributes[PortAttributes.PORT_DESCRIPTION] = self.port_description
         port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
@@ -151,7 +153,8 @@ class GenericPort(object):
         Build PortChannel instance using collected information
         :return:
         """
-        port_channel = PortChannel(self.port_phis_id, self.name)
+        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index)
+        port_channel = PortChannel(self.port_phis_id, self.name, unique_id=unique_id)
         port_channel_attributes = dict()
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
         port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
@@ -171,11 +174,12 @@ class JuniperSnmpAutoload(object):
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
     # SUPPORTED_OS = [r'[Jj]uniper']
 
-    def __init__(self, snmp_handler, logger):
+    def __init__(self, snmp_handler, resource_name, logger):
         self._content_indexes = None
         self._if_indexes = None
         self._logger = logger
         self._snmp_handler = snmp_handler
+        self._resource_name = resource_name
         self._initialize_snmp_handler()
 
         self._logical_generic_ports = {}
@@ -186,7 +190,7 @@ class JuniperSnmpAutoload(object):
         self.sub_modules = {}
         self._modules = {}
         self._chassis = {}
-        self._root = RootElement()
+        self._root = RootElement(unique_id=self._resource_name)
 
         self._ipv4_table = None
         self._ipv6_table = None
@@ -314,7 +318,8 @@ class JuniperSnmpAutoload(object):
                     index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 chassis_id = index2
-                chassis = Chassis(chassis_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'chassis', index)
+                chassis = Chassis(chassis_id, unique_id=unique_id)
 
                 chassis_attributes = dict()
                 chassis_attributes[ChassisAttributes.MODEL] = self._get_element_model(content_data)
@@ -341,7 +346,8 @@ class JuniperSnmpAutoload(object):
                                                                 power_modules_snmp_attributes).get(index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
-                element = PowerPort(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'power_port', index)
+                element = PowerPort(element_id, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[PowerPortAttributes.MODEL] = self._get_element_model(content_data)
@@ -373,7 +379,8 @@ class JuniperSnmpAutoload(object):
                                                                 modules_snmp_attributes).get(index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
-                element = Module(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'module', index)
+                element = Module(element_id, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[ModuleAttributes.MODEL] = self._get_element_model(content_data)
@@ -406,7 +413,8 @@ class JuniperSnmpAutoload(object):
                 index1, index2, index3, index4 = index.split('.')[:4]
                 parent_id = index2
                 element_id = index3
-                element = SubModule(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'sub_module', index)
+                element = SubModule(element_id, unique_id=unique_id)
                 element_attributes = dict()
                 element_attributes[SubModuleAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
@@ -432,7 +440,7 @@ class JuniperSnmpAutoload(object):
 
         for index in self.if_indexes:
             index = int(index)
-            generic_port = GenericPort(index, self.snmp_handler)
+            generic_port = GenericPort(index, self.snmp_handler, self._resource_name)
             if not self._port_filtered_by_description(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
                     self._physical_generic_ports[index] = generic_port
@@ -582,7 +590,8 @@ class JuniperSnmpAutoload(object):
         """
         self.logger.debug('-------------------- <RESOURCES> ----------------------')
         for resource in autoload_details.resources:
-            self.logger.debug('{0}, {1}'.format(resource.relative_address, resource.name))
+            self.logger.debug(
+                '{0}, {1}, {2}'.format(resource.relative_address, resource.name, resource.unique_identifier))
         self.logger.debug('-------------------- </RESOURCES> ----------------------')
 
         self.logger.debug('-------------------- <ATTRIBUTES> ---------------------')

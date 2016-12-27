@@ -56,17 +56,17 @@ class DefaultCommandMode(CommandMode):
         return OrderedDict()
 
     def enter_error_map(self):
-        return OrderedDict((r'[Ee]rror:', 'Command error'))
+        return OrderedDict([(r'[Ee]rror:', 'Command error')])
 
     def exit_action_map(self):
         return OrderedDict()
 
     def exit_error_map(self):
-        return OrderedDict((r'[Ee]rror:', 'Command error'))
+        return OrderedDict([(r'[Ee]rror:', 'Command error')])
 
 
 class ConfigCommandMode(CommandMode):
-    PROMPT = r'#\s*$'
+    PROMPT = r'\[edit\]\n.*#\s*$'
     ENTER_COMMAND = 'configure'
     EXIT_COMMAND = 'exit'
 
@@ -80,19 +80,19 @@ class ConfigCommandMode(CommandMode):
                              exit_error_map=self.exit_error_map())
 
     def enter_action_map(self):
-        return OrderedDict({r'[Pp]assword': lambda session, logger: session.send_line(
+        return OrderedDict([(r'[Pp]assword', lambda session, logger: session.send_line(
             decrypt_password(self._api,
                              get_attribute_by_name(attributes.ENABLE_PASSWORD, self._context) or get_attribute_by_name(
-                                 attributes.PASSWORD, self._context)))})
+                                 attributes.PASSWORD, self._context))))])
 
     def enter_error_map(self):
-        return OrderedDict((r'[Ee]rror:', 'Command error'))
+        return OrderedDict([(r'[Ee]rror:', 'Command error')])
 
     def exit_action_map(self):
         return OrderedDict()
 
     def exit_error_map(self):
-        return OrderedDict((r'[Ee]rror:', 'Command error'))
+        return OrderedDict([(r'[Ee]rror:', 'Command error')])
 
 
 CommandMode.RELATIONS_DICT = {
