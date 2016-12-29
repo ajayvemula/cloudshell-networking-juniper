@@ -138,7 +138,7 @@ class GenericPort(object):
         port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
         port_attributes[PortAttributes.MAC_ADDRESS] = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
         port_attributes[PortAttributes.MTU] = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
-        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifSpeed')
+        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifHighSpeed')
         port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
         port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
