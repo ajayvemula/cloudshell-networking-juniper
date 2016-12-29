@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from cloudshell.networking.devices.runners.run_command_runner import RunCommandRunner
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 
@@ -13,4 +16,10 @@ class JuniperRunCommandRunner(RunCommandRunner):
         """
 
         super(JuniperRunCommandRunner, self).__init__(logger)
-        self._cli_handler = JuniperCliHandler(cli, context, logger, api)
+        self.cli = cli
+        self.api = api
+        self.context = context
+
+    @property
+    def cli_handler(self):
+        return JuniperCliHandler(self.cli, self.context, self._logger, self.api)

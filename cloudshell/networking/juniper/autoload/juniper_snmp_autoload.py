@@ -1,17 +1,25 @@
-from cloudshell.networking.devices.autoload.networking_attributes import RootAttributes, ChassisAttributes, \
-    PowerPortAttributes, \
-    ModuleAttributes, SubModuleAttributes, PortAttributes, PortChannelAttributes
-from cloudshell.networking.devices.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, \
-    PowerPort, \
-    PortChannel
-from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemoveVlanHelper
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import re
 import os
+
+# from cloudshell.networking.devices.autoload.networking_attributes import RootAttributes, ChassisAttributes, \
+#     PowerPortAttributes, \
+#     ModuleAttributes, SubModuleAttributes, PortAttributes, PortChannelAttributes
+from cloudshell.networking.devices.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, \
+    PowerPort, \
+    PortChannel
+
+from cloudshell.networking.devices.autoload.autoload_builder import AutoloadDetailsBuilder
+from cloudshell.networking.standards.networking.autoload_structure import *
+
+from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemoveVlanHelper
+
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
 
 
-class GenericPort(object):
+class JuniperGenericPort(object):
     """
     Collect information and build Port or PortChannel
     """
@@ -24,13 +32,15 @@ class GenericPort(object):
     IF_MIB = 'IF-MIB'
     ETHERLIKE_MIB = 'EtherLike-MIB'
 
-    def __init__(self, index, snmp_handler, resource_name):
+    def __init__(self, index, snmp_handler, shell_name, shell_type, resource_name):
         """
         Create GenericPort with index and snmp handler
         :param index:
         :param snmp_handler:
         :return:
         """
+        self.shell_name = shell_name
+        self.shell_type = shell_type
         self.associated_port_names = []
         self.index = index
         self._snmp_handler = snmp_handler
@@ -131,21 +141,22 @@ class GenericPort(object):
         Build Port instance using collected information
         :return:
         """
-        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port', self.index)
-        port = Port(self.port_phis_id, self.name, unique_id=unique_id)
-        port_attributes = dict()
-        port_attributes[PortAttributes.PORT_DESCRIPTION] = self.port_description
-        port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
-        port_attributes[PortAttributes.MAC_ADDRESS] = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
-        port_attributes[PortAttributes.MTU] = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
-        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifSpeed')
-        port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
-        port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
-        port_attributes[PortAttributes.DUPLEX] = self._get_port_duplex()
-        port_attributes[PortAttributes.AUTO_NEGOTIATION] = self._get_port_autoneg()
-        port_attributes[PortAttributes.ADJACENT] = self._get_port_adjacent()
-        port.build_attributes(port_attributes)
+        port = GenericPort(shell_name=self.shell_name,
+                           name=self.name,
+                           unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port', self.index))
+
+        port.port_description = self.port_description
+        port.l2_protocol_type = self.type
+        port.mac_address = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
+        port.mtu = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
+        port.bandwidth = self._get_snmp_attribute(self.IF_MIB, 'ifSpeed')
+        port.ipv4_address = self._get_associated_ipv4_address()
+        port.ipv6_address = self._get_associated_ipv6_address()
+        port.protocol_type = self._get_snmp_attribute(self.IF_MIB, 'protoType')
+        port.duplex = self._get_port_duplex()
+        port.auto_negotiation = self._get_port_autoneg()
+        port.adjacent = self._get_port_adjacent()
+
         return port
 
     def get_portchannel(self):
@@ -153,16 +164,19 @@ class GenericPort(object):
         Build PortChannel instance using collected information
         :return:
         """
-        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index)
-        port_channel = PortChannel(self.port_phis_id, self.name, unique_id=unique_id)
-        port_channel_attributes = dict()
-        port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
-        port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
-        port_channel_attributes[PortChannelAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB,
-                                                                                                'protoType')
-        port_channel_attributes[PortChannelAttributes.ASSOCIATED_PORTS] = ','.join(self.associated_port_names)
-        port_channel.build_attributes(port_channel_attributes)
+
+        port_channel = GenericPortChannel(shell_name=self.shell_name,
+                                          name=self.name,
+                                          unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index))
+
+        # port_channel = PortChannel(self.port_phis_id, self.name, unique_id=unique_id)
+
+        port_channel.port_description = self.port_description
+        port_channel.ipv4_address = self._get_associated_ipv4_address()
+        port_channel.ipv6_address = self._get_associated_ipv6_address()
+        port_channel.protocol_type = self._get_snmp_attribute(self.IF_MIB, 'protoType')
+        port_channel.associated_ports = ','.join(self.associated_port_names)
+
         return port_channel
 
 
@@ -172,9 +186,12 @@ class JuniperSnmpAutoload(object):
     """
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap', 'fxp']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
+
     # SUPPORTED_OS = [r'[Jj]uniper']
 
-    def __init__(self, snmp_handler, resource_name, logger):
+    def __init__(self, snmp_handler, shell_name, shell_type, resource_name, logger):
+        self.shell_name = shell_name
+        self.shell_type = shell_type
         self._content_indexes = None
         self._if_indexes = None
         self._logger = logger
@@ -182,15 +199,18 @@ class JuniperSnmpAutoload(object):
         self._resource_name = resource_name
         self._initialize_snmp_handler()
 
+        self.resource = GenericResource(shell_name=shell_name,
+                                        shell_type=shell_type,
+                                        name=resource_name,
+                                        unique_id=resource_name)
+        self._chassis = {}
+        self._modules = {}
+        self.sub_modules = {}
+        self._ports = {}
         self._logical_generic_ports = {}
         self._physical_generic_ports = {}
         self._generic_physical_ports_by_description = None
         self._generic_logical_ports_by_description = None
-        self._ports = {}
-        self.sub_modules = {}
-        self._modules = {}
-        self._chassis = {}
-        self._root = RootElement(unique_id=self._resource_name)
 
         self._ipv4_table = None
         self._ipv6_table = None
@@ -271,14 +291,13 @@ class JuniperSnmpAutoload(object):
         os_version_search = re.search('JUNOS \S+(,)?\s', sys_descr, re.IGNORECASE)
         if os_version_search:
             os_version = os_version_search.group(0).replace('JUNOS ', '').replace(',', '').strip(' \t\n\r')
-        root_attributes = dict()
-        root_attributes[RootAttributes.CONTACT_NAME] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysContact', '0')
-        root_attributes[RootAttributes.SYSTEM_NAME] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysName', '0')
-        root_attributes[RootAttributes.LOCATION] = self.snmp_handler.get_property('SNMPv2-MIB', 'sysLocation', '0')
-        root_attributes[RootAttributes.OS_VERSION] = os_version
-        root_attributes[RootAttributes.VENDOR] = vendor
-        root_attributes[RootAttributes.MODEL] = model
-        self._root.build_attributes(root_attributes)
+
+        self.resource.contact_name = self.snmp_handler.get_property('SNMPv2-MIB', 'sysContact', '0')
+        self.resource.system_name = self.snmp_handler.get_property('SNMPv2-MIB', 'sysName', '0')
+        self.resource.location = self.snmp_handler.get_property('SNMPv2-MIB', 'sysLocation', '0')
+        self.resource.os_version = os_version
+        self.resource.vendor = vendor
+        self.resource.model = model
 
     def _get_content_indexes(self):
         container_indexes = self.snmp_handler.walk(('JUNIPER-MIB', 'jnxContentsContainerIndex'))
@@ -318,111 +337,116 @@ class JuniperSnmpAutoload(object):
                     index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 chassis_id = index2
-                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'chassis', index)
-                chassis = Chassis(chassis_id, unique_id=unique_id)
 
-                chassis_attributes = dict()
-                chassis_attributes[ChassisAttributes.MODEL] = self._get_element_model(content_data)
-                chassis_attributes[ChassisAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
-                chassis.build_attributes(chassis_attributes)
-                self._root.chassis.append(chassis)
-                chassis_id_str = content_data.get('jnxContentsChassisId')
+                chassis = GenericChassis(shell_name=self.shell_name,
+                                         name="Chassis {}".format(chassis_id),
+                                         unique_id="{0}.{1}.{2}".format(self._resource_name, "chassis", index))
+                chassis.model = self._get_element_model(content_data)
+                chassis.serial_number = content_data.get("jnxContentsSerialNo")
+
+                self.resource.add_sub_resource(chassis_id, chassis)
+
+                chassis_id_str = content_data.get("jnxContentsChassisId")
                 if chassis_id_str:
-                    self._chassis[chassis_id_str.strip('\'')] = chassis
+                    self._chassis[chassis_id_str.strip("'")] = chassis
 
     def _build_power_modules(self):
         """
         Build Power modules resources and attributes
         :return:
         """
-        self.logger.debug('Building PowerPorts')
-        power_modules_snmp_attributes = {'jnxContentsModel': 'str', 'jnxContentsType': 'str', 'jnxContentsDescr': 'str',
-                                         'jnxContentsSerialNo': 'str', 'jnxContentsRevision': 'str',
-                                         'jnxContentsChassisId': 'str'}
-        element_index = '2'
+        self.logger.debug("Building PowerPorts")
+        power_modules_snmp_attributes = {"jnxContentsModel": "str", "jnxContentsType": "str", "jnxContentsDescr": "str",
+                                         "jnxContentsSerialNo": "str", "jnxContentsRevision": "str",
+                                         "jnxContentsChassisId": "str"}
+        element_index = "2"
         if element_index in self.content_indexes:
             for index in self.content_indexes[element_index]:
-                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                content_data = self.snmp_handler.get_properties("JUNIPER-MIB", index,
                                                                 power_modules_snmp_attributes).get(index)
-                index1, index2, index3, index4 = index.split('.')[:4]
-                element_id = index2
-                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'power_port', index)
-                element = PowerPort(element_id, unique_id=unique_id)
+                index1, index2, index3, index4 = index.split(".")[:4]
+                power_port_id = index2
 
-                element_attributes = dict()
-                element_attributes[PowerPortAttributes.MODEL] = self._get_element_model(content_data)
-                element_attributes[PowerPortAttributes.PORT_DESCRIPTION] = content_data.get('jnxContentsDescr')
-                element_attributes[PowerPortAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
-                element_attributes[PowerPortAttributes.VERSION] = content_data.get('jnxContentsRevision')
-                element.build_attributes(element_attributes)
-                chassis_id_str = content_data.get('jnxContentsChassisId')
+                power_port = GenericPowerPort(shell_name=self.shell_name,
+                                              name="PP{}".format(power_port_id),
+                                              unique_id="{0}.{1}.{2}".format(self._resource_name, "power_port", index))
+
+                power_port.model = self._get_element_model(content_data)
+                power_port.port_description = content_data.get("jnxContentsDescr")
+                power_port.serial_number = content_data.get("jnxContentsSerialNo")
+                power_port.version = content_data.get("jnxContentsRevision")
+
+                chassis_id_str = content_data.get("jnxContentsChassisId")
                 if chassis_id_str:
-                    chassis = self._chassis.get(chassis_id_str.strip('\''))
+                    chassis = self._chassis.get(chassis_id_str.strip("'"))
                     if chassis:
-                        chassis.power_ports.append(element)
+                        chassis.add_sub_resource(power_port_id, power_port)
 
     def _build_modules(self):
         """
         Build Modules resources and attributes
         :return:
         """
-        self.logger.debug('Building Modules')
-        modules_snmp_attributes = {'jnxContentsModel': 'str',
-                                   'jnxContentsType': 'str',
-                                   'jnxContentsSerialNo': 'str',
-                                   'jnxContentsRevision': 'str',
-                                   'jnxContentsChassisId': 'str'}
-        element_index = '7'
+        self.logger.debug("Building Modules")
+        modules_snmp_attributes = {"jnxContentsModel": "str",
+                                   "jnxContentsType": "str",
+                                   "jnxContentsSerialNo": "str",
+                                   "jnxContentsRevision": "str",
+                                   "jnxContentsChassisId": "str"}
+        element_index = "7"
         if element_index in self.content_indexes:
             for index in self.content_indexes[element_index]:
-                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                content_data = self.snmp_handler.get_properties("JUNIPER-MIB", index,
                                                                 modules_snmp_attributes).get(index)
-                index1, index2, index3, index4 = index.split('.')[:4]
-                element_id = index2
-                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'module', index)
-                element = Module(element_id, unique_id=unique_id)
+                index1, index2, index3, index4 = index.split(".")[:4]
+                module_id = index2
 
-                element_attributes = dict()
-                element_attributes[ModuleAttributes.MODEL] = self._get_element_model(content_data)
-                element_attributes[ModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
-                element_attributes[ModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
-                element.build_attributes(element_attributes)
-                chassis_id_str = content_data.get('jnxContentsChassisId')
+                module = GenericModule(shell_name=self.shell_name,
+                                       name="Module {}".format(module_id),
+                                       unique_id="{0}.{1}.{2}".format(self._resource_name, "module", index))
+
+                module.model = self._get_element_model(content_data)
+                module.serial_number = content_data.get("jnxContentsSerialNo")
+                module.version = content_data.get("jnxContentsRevision")
+
+                chassis_id_str = content_data.get("jnxContentsChassisId")
                 if chassis_id_str:
-                    chassis = self._chassis.get(chassis_id_str.strip('\''))
+                    chassis = self._chassis.get(chassis_id_str.strip("'"))
                     if chassis:
-                        chassis.modules.append(element)
-                        self._modules[element_id] = element
+                        chassis.add_sub_resource(module_id, module)
+                        self._modules[module_id] = module
 
     def _build_sub_modules(self):
         """
         Build SubModules resources and attributes
         :return:
         """
-        self.logger.debug('Building Sub Modules')
-        sub_modules_snmp_attributes = {'jnxContentsModel': 'str',
-                                       'jnxContentsType': 'str',
-                                       'jnxContentsSerialNo': 'str',
-                                       'jnxContentsRevision': 'str'}
+        self.logger.debug("Building Sub Modules")
+        sub_modules_snmp_attributes = {"jnxContentsModel": "str",
+                                       "jnxContentsType": "str",
+                                       "jnxContentsSerialNo": "str",
+                                       "jnxContentsRevision": "str"}
 
-        element_index = '8'
+        element_index = "8"
         if element_index in self.content_indexes:
             for index in self.content_indexes[element_index]:
-                content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
+                content_data = self.snmp_handler.get_properties("JUNIPER-MIB", index,
                                                                 sub_modules_snmp_attributes).get(index)
-                index1, index2, index3, index4 = index.split('.')[:4]
+                index1, index2, index3, index4 = index.split(".")[:4]
                 parent_id = index2
-                element_id = index3
-                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'sub_module', index)
-                element = SubModule(element_id, unique_id=unique_id)
-                element_attributes = dict()
-                element_attributes[SubModuleAttributes.MODEL] = self._get_element_model(content_data)
-                element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
-                element_attributes[SubModuleAttributes.VERSION] = content_data.get('jnxContentsRevision')
-                element.build_attributes(element_attributes)
+                sub_module_id = index3
+
+                sub_module = GenericSubModule(shell_name=self.shell_name,
+                                              name="SubModule {}".format(sub_module_id),
+                                              unique_id="{0}.{1}.{2}".format(self._resource_name, "sub_module", index))
+
+                sub_module.model = self._get_element_model(content_data)
+                sub_module.serial_number = content_data.get("jnxContentsSerialNo")
+                sub_module.version = content_data.get("jnxContentsRevision")
+
                 if parent_id in self._modules:
-                    self._modules[parent_id].sub_modules.append(element)
-                    self.sub_modules[element_id] = element
+                    self._modules[parent_id].add_sub_resource(sub_module_id, sub_module)
+                    self.sub_modules[sub_module_id] = sub_module
 
     @staticmethod
     def _get_element_model(content_data):
@@ -433,14 +457,14 @@ class JuniperSnmpAutoload(object):
 
     def _build_generic_ports(self):
         """
-        Build GenericPort instances
+        Build JuniperGenericPort instances
         :return:
         """
         self.logger.debug("Building generic ports")
 
         for index in self.if_indexes:
             index = int(index)
-            generic_port = GenericPort(index, self.snmp_handler, self._resource_name)
+            generic_port = JuniperGenericPort(index, self.snmp_handler, self._resource_name)
             if not self._port_filtered_by_description(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
                     self._physical_generic_ports[index] = generic_port
@@ -540,7 +564,8 @@ class JuniperSnmpAutoload(object):
         self._associate_portchannels()
         for generic_port in self._physical_generic_ports.values():
             if generic_port.is_portchannel:
-                self._root.port_channels.append(generic_port.get_portchannel())
+                self.resource.add_sub_resource(generic_port.port_phis_id, generic_port.get_portchannel())
+                # self._root.port_channels.append(generic_port.get_portchannel())
             else:
                 port = generic_port.get_port()
                 if generic_port.fpc_id > 0 and generic_port.fpc_id in self._modules:
@@ -548,14 +573,17 @@ class JuniperSnmpAutoload(object):
                     if fpc and generic_port.pic_id > 0:
                         pic = self._get_pic_by_index(fpc, int(generic_port.pic_id))
                         if pic:
-                            pic.ports.append(port)
+                            pic.add_sub_resource(generic_port.port_phis_id, port)
+                            # pic.ports.append(port)
                         else:
                             self.logger.info('Port {} is not allowed'.format(port.name))
                     else:
-                        fpc.ports.append(port)
+                        fpc.add_sub_resource(generic_port.port_phis_id, port)
+                        # fpc.ports.append(port)
                 else:
                     chassis = self._chassis.values()[0]
-                    chassis.ports.append(generic_port.get_port())
+                    chassis.add_sub_resource(generic_port.port_phis_id, port)
+                    # chassis.ports.append(generic_port.get_port())
 
     def _get_pic_by_index(self, fpc, index):
         for pic in fpc.sub_modules:
@@ -615,6 +643,7 @@ class JuniperSnmpAutoload(object):
         self._build_modules()
         self._build_sub_modules()
         self._build_ports()
-        autoload_details = self._root.get_autoload_details()
+        autoload_details = AutoloadDetailsBuilder(self.resource).autoload_details()
+        # autoload_details = self._root.get_autoload_details()
         self._log_autoload_details(autoload_details)
         return autoload_details

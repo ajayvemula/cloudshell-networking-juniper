@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from cloudshell.networking.devices.runners.connectivity_runner import ConnectivityRunner
 from cloudshell.networking.juniper.flows.juniper_add_vlan_flow import JuniperAddVlanFlow
 from cloudshell.networking.juniper.flows.juniper_remove_vlan_flow import JuniperRemoveVlanFlow
@@ -16,6 +19,18 @@ class JuniperConnectivityRunner(ConnectivityRunner):
             :param supported_os:
             """
         super(JuniperConnectivityRunner, self).__init__(logger)
-        self._cli_handler = JuniperCliHandler(cli, context, logger, api)
-        self.add_vlan_flow = JuniperAddVlanFlow(self._cli_handler, logger)
-        self.remove_vlan_flow = JuniperRemoveVlanFlow(self._cli_handler, logger)
+        self.cli = cli
+        self.api = api
+        self.context = context
+
+    @property
+    def cli_handler(self):
+        return JuniperCliHandler(self.cli, self.context, self._logger, self.api)
+
+    @property
+    def remove_vlan_flow(self):
+        return JuniperRemoveVlanFlow(self.cli_handler, self._logger)
+
+    @property
+    def add_vlan_flow(self):
+        return JuniperAddVlanFlow(self.cli_handler, self._logger)
