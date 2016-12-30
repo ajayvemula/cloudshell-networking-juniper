@@ -1,18 +1,14 @@
-from cloudshell.networking.autoload.networking_attributes import RootAttributes, ChassisAttributes, PowerPortAttributes, \
+from cloudshell.networking.devices.autoload.networking_attributes import RootAttributes, ChassisAttributes, \
+    PowerPortAttributes, \
     ModuleAttributes, SubModuleAttributes, PortAttributes, PortChannelAttributes
-from cloudshell.networking.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, PowerPort, \
+from cloudshell.networking.devices.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, \
+    PowerPort, \
     PortChannel
-from cloudshell.networking.operations.interfaces.autoload_operations_interface import AutoloadOperationsInterface
-from cloudshell.shell.core.config_utils import override_attributes_from_config
-import inject
+from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemoveVlanHelper
+
 import re
 import os
 from cloudshell.networking.juniper.utils import sort_elements_by_attributes
-from cloudshell.configuration.cloudshell_snmp_binding_keys import SNMP_HANDLER
-from cloudshell.configuration.cloudshell_cli_binding_keys import CLI_SERVICE
-from cloudshell.configuration.cloudshell_shell_core_binding_keys import LOGGER, CONFIG
-from cloudshell.shell.core.context_utils import get_attribute_by_name
-from cloudshell.networking.juniper.command_templates import enable_disable_snmp
 
 
 class GenericPort(object):
@@ -28,7 +24,7 @@ class GenericPort(object):
     IF_MIB = 'IF-MIB'
     ETHERLIKE_MIB = 'EtherLike-MIB'
 
-    def __init__(self, index, snmp_handler):
+    def __init__(self, index, snmp_handler, resource_name):
         """
         Create GenericPort with index and snmp handler
         :param index:
@@ -38,9 +34,10 @@ class GenericPort(object):
         self.associated_port_names = []
         self.index = index
         self._snmp_handler = snmp_handler
+        self._resource_name = resource_name
 
         self._port_phis_id = None
-        self._port_description = None
+        self._port_name = None
         self._logical_unit = None
         self._fpc_id = None
         self._pic_id = None
@@ -50,14 +47,13 @@ class GenericPort(object):
         self.ipv6_addresses = []
         self.port_adjacent = None
 
-        if self.port_description[:2] in self.PORTCHANNEL_DESCRIPTIONS:
+        if self.port_name[:2] in self.PORTCHANNEL_DESCRIPTIONS:
             self.is_portchannel = True
         else:
             self.is_portchannel = False
 
-        overridden_config = override_attributes_from_config(GenericPort)
-        self._port_name_char_replacement = overridden_config.PORT_NAME_CHAR_REPLACEMENT
-        self._max_string_length = overridden_config.AUTOLOAD_MAX_STRING_LENGTH
+        self._port_name_char_replacement = self.PORT_NAME_CHAR_REPLACEMENT
+        self._max_string_length = self.AUTOLOAD_MAX_STRING_LENGTH
 
     def _get_snmp_attribute(self, mib, snmp_attribute):
         return self._snmp_handler.get_property(mib, snmp_attribute, self.index)
@@ -70,9 +66,7 @@ class GenericPort(object):
 
     @property
     def port_description(self):
-        if not self._port_description:
-            self._port_description = self._get_snmp_attribute(self.IF_MIB, 'ifDescr')
-        return self._port_description
+        return self._get_snmp_attribute('IF-MIB', 'ifAlias')
 
     @property
     def logical_unit(self):
@@ -99,13 +93,10 @@ class GenericPort(object):
         return self._type
 
     @property
-    def name(self):
-        return self._convert_port_name(self.port_description)
-
-    def _convert_port_name(self, port_name):
-        for char, replacement in self._port_name_char_replacement.iteritems():
-            port_name = port_name.replace(char, replacement)
-        return port_name
+    def port_name(self):
+        if not self._port_name:
+            self._port_name = self._get_snmp_attribute(self.IF_MIB, 'ifDescr')
+        return self._port_name
 
     def _get_associated_ipv4_address(self):
         return self._validate_attribute_value(','.join(self.ipv4_addresses))
@@ -139,13 +130,15 @@ class GenericPort(object):
         Build Port instance using collected information
         :return:
         """
-        port = Port(self.port_phis_id, self.name)
+        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port', self.index)
+        port_name = AddRemoveVlanHelper.convert_port_name(self.port_name)
+        port = Port(self.port_phis_id, port_name, unique_id=unique_id)
         port_attributes = dict()
         port_attributes[PortAttributes.PORT_DESCRIPTION] = self.port_description
         port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
         port_attributes[PortAttributes.MAC_ADDRESS] = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
         port_attributes[PortAttributes.MTU] = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
-        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifSpeed')
+        port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifHighSpeed')
         port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
         port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
@@ -160,7 +153,9 @@ class GenericPort(object):
         Build PortChannel instance using collected information
         :return:
         """
-        port_channel = PortChannel(self.port_phis_id, self.name)
+        unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index)
+        port_name = AddRemoveVlanHelper.convert_port_name(self.port_name)
+        port_channel = PortChannel(self.port_phis_id, port_name, unique_id=unique_id)
         port_channel_attributes = dict()
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
         port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
@@ -172,33 +167,32 @@ class GenericPort(object):
         return port_channel
 
 
-class JuniperSnmpAutoload(AutoloadOperationsInterface):
+class JuniperSnmpAutoload(object):
     """
     Load inventory by snmp and build device elements and attributes
     """
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap', 'fxp']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
-    SUPPORTED_OS = [r'[Jj]uniper']
+    # SUPPORTED_OS = [r'[Jj]uniper']
+    SNMP_ERRORS = [r'No\s+Such\s+Object\s+currently\s+exists']
 
-    def __init__(self, snmp_handler=None, logger=None, config=None, cli_service=None, snmp_community=None):
+    def __init__(self, snmp_handler, resource_name, logger):
         self._content_indexes = None
         self._if_indexes = None
         self._logger = logger
-        self._snmp_handler = None
-        self.snmp_handler = snmp_handler
-        self._config = config
-        self._cli_service = cli_service
-        self._snmp_community = snmp_community
+        self._snmp_handler = snmp_handler
+        self._resource_name = resource_name
+        self._initialize_snmp_handler()
 
         self._logical_generic_ports = {}
         self._physical_generic_ports = {}
-        self._generic_physical_ports_by_description = None
-        self._generic_logical_ports_by_description = None
+        self._generic_physical_ports_by_name = None
+        self._generic_logical_ports_by_name = None
         self._ports = {}
         self.sub_modules = {}
         self._modules = {}
         self._chassis = {}
-        self._root = RootElement()
+        self._root = RootElement(unique_id=self._resource_name)
 
         self._ipv4_table = None
         self._ipv6_table = None
@@ -206,70 +200,13 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self._autoneg = None
         self._lldp_keys = None
 
-        """Override attributes from global config"""
-        overridden_config = override_attributes_from_config(JuniperSnmpAutoload, config=self.config)
-        self._supported_os = overridden_config.SUPPORTED_OS
-
-    @property
-    def snmp_community(self):
-        if self._snmp_community is None:
-            self._snmp_community = get_attribute_by_name("SNMP Read Community") or "quali"
-        return self._snmp_community
-
-    def enable_snmp(self):
-        """Enable SNMP Agent on the device and configure community string if needed
-
-        NOTE: this will work only for devices with Junos OS
-        """
-        snmp_community_info = self.cli_service.send_config_command('show snmp community "{}"'
-                                                                   .format(self.snmp_community))
-
-        if "authorization read" not in snmp_community_info:
-            self.logger.debug("SNMP community string '{}' is not present on the device. "
-                              "Trying to add it".format(self.snmp_community))
-
-            self.cli_service.send_command_list([
-                enable_disable_snmp.ENTER_EDIT_SNMP.get_command(),
-                enable_disable_snmp.ENABLE_SNMP.get_command(self.snmp_community),
-                enable_disable_snmp.EXIT_EDIT_SNMP.get_command(),
-            ])
-
-            self.cli_service.commit()
-            self.logger.debug("SNMP community string '{}' was added to the the device.".format(self.snmp_community))
-
-    def disable_snmp(self):
-        """Disable SNMP Agent on the device
-
-        NOTE: this will work only for devices with Junos OS
-        """
-        self.logger.debug("Trying to delete SNMP configuration from the device")
-        self.cli_service.send_config_command(enable_disable_snmp.DISABLE_SNMP.get_command())
-        self.cli_service.commit()
-        self.logger.debug("SNMP configuration was successfully deleted from the device")
-
     @property
     def logger(self):
-        return self._logger or inject.instance(LOGGER)
-
-    @property
-    def config(self):
-        return self._config or inject.instance(CONFIG)
+        return self._logger
 
     @property
     def snmp_handler(self):
-        if self._snmp_handler is None:
-            self.snmp_handler = inject.instance(SNMP_HANDLER)
         return self._snmp_handler
-
-    @snmp_handler.setter
-    def snmp_handler(self, snmp_handler):
-        if snmp_handler:
-            self._snmp_handler = snmp_handler
-            self._initialize_snmp_handler()
-
-    @property
-    def cli_service(self):
-        return self._cli_service or inject.instance(CLI_SERVICE)
 
     @property
     def ipv4_table(self):
@@ -286,20 +223,20 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         return self._ipv6_table
 
     @property
-    def generic_physical_ports_by_description(self):
-        if not self._generic_physical_ports_by_description:
-            self._generic_physical_ports_by_description = {}
+    def generic_physical_ports_by_name(self):
+        if not self._generic_physical_ports_by_name:
+            self._generic_physical_ports_by_name = {}
             for index, generic_port in self._physical_generic_ports.iteritems():
-                self._generic_physical_ports_by_description[generic_port.port_description] = generic_port
-        return self._generic_physical_ports_by_description
+                self._generic_physical_ports_by_name[generic_port.port_name] = generic_port
+        return self._generic_physical_ports_by_name
 
     @property
-    def generic_logical_ports_by_description(self):
-        if not self._generic_logical_ports_by_description:
-            self._generic_logical_ports_by_description = {}
+    def generic_logical_ports_by_name(self):
+        if not self._generic_logical_ports_by_name:
+            self._generic_logical_ports_by_name = {}
             for index, generic_port in self._logical_generic_ports.iteritems():
-                self._generic_logical_ports_by_description[generic_port.port_description] = generic_port
-        return self._generic_logical_ports_by_description
+                self._generic_logical_ports_by_name[generic_port.port_name] = generic_port
+        return self._generic_logical_ports_by_name
 
     def _build_lldp_keys(self):
         result_dict = {}
@@ -335,6 +272,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         self.snmp_handler.load_mib('IP-MIB')
         self.snmp_handler.load_mib('IPV6-MIB')
         self.snmp_handler.load_mib('LLDP-MIB')
+        self._snmp_handler.set_snmp_errors(self.SNMP_ERRORS)
 
     def _build_root(self):
         """
@@ -402,7 +340,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                     index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 chassis_id = index2
-                chassis = Chassis(chassis_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'chassis', index)
+                chassis = Chassis(chassis_id, unique_id=unique_id)
 
                 chassis_attributes = dict()
                 chassis_attributes[ChassisAttributes.MODEL] = self._get_element_model(content_data)
@@ -429,7 +368,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                                                                 power_modules_snmp_attributes).get(index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
-                element = PowerPort(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'power_port', index)
+                element = PowerPort(element_id, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[PowerPortAttributes.MODEL] = self._get_element_model(content_data)
@@ -461,7 +401,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                                                                 modules_snmp_attributes).get(index)
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
-                element = Module(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'module', index)
+                element = Module(element_id, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[ModuleAttributes.MODEL] = self._get_element_model(content_data)
@@ -494,7 +435,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 index1, index2, index3, index4 = index.split('.')[:4]
                 parent_id = index2
                 element_id = index3
-                element = SubModule(element_id)
+                unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'sub_module', index)
+                element = SubModule(element_id, unique_id=unique_id)
                 element_attributes = dict()
                 element_attributes[SubModuleAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
@@ -520,8 +462,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
 
         for index in self.if_indexes:
             index = int(index)
-            generic_port = GenericPort(index, self.snmp_handler)
-            if not self._port_filtered_by_description(generic_port) and not self._port_filtered_by_type(generic_port):
+            generic_port = GenericPort(index, self.snmp_handler, self._resource_name)
+            if not self._port_filtered_by_name(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
                     self._physical_generic_ports[index] = generic_port
                 else:
@@ -536,7 +478,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         for index in self.ipv4_table:
             if int(index) in self._logical_generic_ports:
                 logical_port = self._logical_generic_ports[int(index)]
-                physical_port = self._get_associated_phisical_port_by_description(logical_port.port_description)
+                physical_port = self.get_associated_phisical_port_by_name(logical_port.port_name)
                 ipv4_address = self.ipv4_table[index].get('ipAdEntAddr')
                 if physical_port and ipv4_address:
                     physical_port.ipv4_addresses.append(ipv4_address)
@@ -550,7 +492,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         for index in self.ipv6_table:
             if int(index) in self._logical_generic_ports:
                 logical_port = self._logical_generic_ports[int(index)]
-                physical_port = self._get_associated_phisical_port_by_description(logical_port.port_description)
+                physical_port = self.get_associated_phisical_port_by_name(logical_port.port_name)
                 ipv6_address = self.ipv6_table[index].get('ipAdEntAddr')
                 if ipv6_address:
                     physical_port.ipv6_addresses.append(ipv6_address)
@@ -565,12 +507,12 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         for port_index in snmp_data:
             port_index = int(port_index)
             if port_index in self._logical_generic_ports:
-                associated_phisical_port = self._get_associated_phisical_port_by_description(
-                    self._logical_generic_ports[port_index].port_description)
+                associated_phisical_port = self.get_associated_phisical_port_by_name(
+                    self._logical_generic_ports[port_index].port_name)
                 logical_portchannel_index = snmp_data[port_index].get('dot3adAggPortAttachedAggID')
                 if logical_portchannel_index and int(logical_portchannel_index) in self._logical_generic_ports:
-                    associated_phisical_portchannel = self._get_associated_phisical_port_by_description(
-                        self._logical_generic_ports[int(logical_portchannel_index)].port_description)
+                    associated_phisical_portchannel = self.get_associated_phisical_port_by_name(
+                        self._logical_generic_ports[int(logical_portchannel_index)].port_name)
                     if associated_phisical_portchannel:
                         associated_phisical_portchannel.is_portchannel = True
                         if associated_phisical_port:
@@ -579,8 +521,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
     def _associate_adjacent(self):
         for index in self.lldp_keys:
             if int(index) in self._logical_generic_ports:
-                physical_port = self._get_associated_phisical_port_by_description(
-                    self._logical_generic_ports[int(index)].port_description)
+                physical_port = self.get_associated_phisical_port_by_name(
+                    self._logical_generic_ports[int(index)].port_name)
                 self._set_adjacent(index, physical_port)
             elif int(index) in self._physical_generic_ports:
                 physical_port = self._physical_generic_ports[int(index)]
@@ -591,25 +533,25 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         rem_sys_descr = self._snmp_handler.get_property('LLDP-MIB', 'lldpRemSysDesc', self.lldp_keys[index])
         port.port_adjacent = '{0}, {1}'.format(rem_port_descr, rem_sys_descr)
 
-    def _get_associated_phisical_port_by_description(self, description):
+    def get_associated_phisical_port_by_name(self, description):
         """
         Associate physical port by description
         :param description:
         :return:
         """
-        for port_description in self.generic_physical_ports_by_description:
-            if port_description in description:
-                return self.generic_physical_ports_by_description[port_description]
+        for port_name in self.generic_physical_ports_by_name:
+            if port_name in description:
+                return self.generic_physical_ports_by_name[port_name]
         return None
 
-    def _port_filtered_by_description(self, port):
+    def _port_filtered_by_name(self, port):
         """
         Filter ports by description
         :param port:
         :return:
         """
         for pattern in self.FILTER_PORTS_BY_DESCRIPTION:
-            if re.search(pattern, port.port_description):
+            if re.search(pattern, port.port_name):
                 return True
         return False
 
@@ -659,14 +601,14 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                 return pic
         return None
 
-    def _is_valid_device_os(self):
+    def _is_valid_device_os(self, supported_os):
         """Validate device OS using snmp
             :return: True or False
         """
 
         system_description = self.snmp_handler.get_property('SNMPv2-MIB', 'sysDescr', '0')
         self.logger.debug('Detected system description: \'{0}\''.format(system_description))
-        result = re.search(r"({0})".format("|".join(self._supported_os)),
+        result = re.search(r"({0})".format("|".join(supported_os)),
                            system_description,
                            flags=re.DOTALL | re.IGNORECASE)
 
@@ -674,7 +616,7 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
             return True
         else:
             error_message = 'Incompatible driver! Please use this driver for \'{0}\' operation system(s)'. \
-                format(str(tuple(self._supported_os)))
+                format(str(tuple(supported_os)))
             self.logger.error(error_message)
             return False
 
@@ -686,7 +628,8 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
         """
         self.logger.debug('-------------------- <RESOURCES> ----------------------')
         for resource in autoload_details.resources:
-            self.logger.debug('{0}, {1}'.format(resource.relative_address, resource.name))
+            self.logger.debug(
+                '{0}, {1}, {2}'.format(resource.relative_address, resource.name, resource.unique_identifier))
         self.logger.debug('-------------------- </RESOURCES> ----------------------')
 
         self.logger.debug('-------------------- <ATTRIBUTES> ---------------------')
@@ -695,35 +638,21 @@ class JuniperSnmpAutoload(AutoloadOperationsInterface):
                                                         attribute.attribute_value))
         self.logger.debug('-------------------- </ATTRIBUTES> ---------------------')
 
-    def discover(self):
+    def discover(self, supported_os):
         """
         Call methods in specific order to build resources and attributes
         :return:
         """
-        try:
-            enable_snmp = get_attribute_by_name('Enable SNMP').lower() == 'true'
-            disable_snmp = get_attribute_by_name('Disable SNMP').lower() == 'true'
-        except Exception:
-            enable_snmp = True
-            disable_snmp = False
 
-        if enable_snmp:
-            self.enable_snmp()
-
-        if not self._is_valid_device_os():
+        if not self._is_valid_device_os(supported_os):
             raise Exception(self.__class__.__name__, 'Unsupported device OS')
 
-        try:
-            self._build_root()
-            self._build_chassis()
-            self._build_power_modules()
-            self._build_modules()
-            self._build_sub_modules()
-            self._build_ports()
-            autoload_details = self._root.get_autoload_details()
-            self._log_autoload_details(autoload_details)
-        finally:
-            if disable_snmp:
-                self.disable_snmp()
-
+        self._build_root()
+        self._build_chassis()
+        self._build_power_modules()
+        self._build_modules()
+        self._build_sub_modules()
+        self._build_ports()
+        autoload_details = self._root.get_autoload_details()
+        self._log_autoload_details(autoload_details)
         return autoload_details

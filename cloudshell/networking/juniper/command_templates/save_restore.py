@@ -3,5 +3,5 @@ from cloudshell.cli.command_template.command_template import CommandTemplate
 
 ERROR_MAP = OrderedDict([(r'[Ee]rror:', 'Command error')])
 
-COMMIT = CommandTemplate('commit', error_map=ERROR_MAP)
-ROLLBACK = CommandTemplate('rollback', error_map=ERROR_MAP)
+SAVE = CommandTemplate('save {dst_path}', error_map=ERROR_MAP)
+RESTORE = CommandTemplate('load {restore_type} {src_path}', error_map=ERROR_MAP)
