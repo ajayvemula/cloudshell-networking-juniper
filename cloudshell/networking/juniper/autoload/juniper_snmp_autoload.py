@@ -134,8 +134,7 @@ class GenericPort(object):
         port_name = AddRemoveVlanHelper.convert_port_name(self.port_name)
         port = Port(self.port_phis_id, port_name, unique_id=unique_id)
         port_attributes = dict()
-        descr = self.port_description
-        port_attributes[PortAttributes.PORT_DESCRIPTION] = descr
+        port_attributes[PortAttributes.PORT_DESCRIPTION] = self.port_description
         port_attributes[PortAttributes.L2_PROTOCOL_TYPE] = self.type
         port_attributes[PortAttributes.MAC_ADDRESS] = self._get_snmp_attribute(self.IF_MIB, 'ifPhysAddress')
         port_attributes[PortAttributes.MTU] = self._get_snmp_attribute(self.IF_MIB, 'ifMtu')
