@@ -141,7 +141,6 @@ class GenericPort(object):
         port_attributes[PortAttributes.BANDWIDTH] = self._get_snmp_attribute(self.IF_MIB, 'ifHighSpeed')
         port_attributes[PortAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_attributes[PortAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_attributes[PortAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB, 'protoType')
         port_attributes[PortAttributes.DUPLEX] = self._get_port_duplex()
         port_attributes[PortAttributes.AUTO_NEGOTIATION] = self._get_port_autoneg()
         port_attributes[PortAttributes.ADJACENT] = self.port_adjacent
@@ -160,8 +159,6 @@ class GenericPort(object):
         port_channel_attributes[PortChannelAttributes.PORT_DESCRIPTION] = self.port_description
         port_channel_attributes[PortChannelAttributes.IPV4_ADDRESS] = self._get_associated_ipv4_address()
         port_channel_attributes[PortChannelAttributes.IPV6_ADDRESS] = self._get_associated_ipv6_address()
-        port_channel_attributes[PortChannelAttributes.PROTOCOL_TYPE] = self._get_snmp_attribute(self.IF_MIB,
-                                                                                                'protoType')
         port_channel_attributes[PortChannelAttributes.ASSOCIATED_PORTS] = ','.join(self.associated_port_names)
         port_channel.build_attributes(port_channel_attributes)
         return port_channel
