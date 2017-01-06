@@ -8,8 +8,8 @@ from cloudshell.networking.juniper.flows.juniper_save_flow import JuniperSaveFlo
 
 
 class JuniperConfigurationRunner(ConfigurationRunner):
-    def __init__(self, cli, logger, context, api):
-        super(JuniperConfigurationRunner, self).__init__(logger, context, api)
+    def __init__(self, cli, logger, resource_config, api):
+        super(JuniperConfigurationRunner, self).__init__(logger, resource_config, api)
         self._cli = cli
 
     @property
@@ -17,7 +17,7 @@ class JuniperConfigurationRunner(ConfigurationRunner):
         """ CLI Handler property
         :return: CLI handler
         """
-        return JuniperCliHandler(self._cli, self._context, self._logger, self._api)
+        return JuniperCliHandler(self._cli, self.resource_config, self._logger, self._api)
 
     @property
     def restore_flow(self):

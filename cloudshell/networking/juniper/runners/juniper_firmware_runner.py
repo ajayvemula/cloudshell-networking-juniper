@@ -7,15 +7,15 @@ from cloudshell.networking.juniper.flows.juniper_firmware_flow import JuniperFir
 
 
 class JuniperFirmwareRunner(FirmwareRunner):
-    def __init__(self, cli, logger, context, api):
+    def __init__(self, cli, logger, resource_config, api):
         super(JuniperFirmwareRunner, self).__init__(logger)
         self.cli = cli
         self.api = api
-        self.context = context
+        self.resource_config = resource_config
 
     @property
     def cli_handler(self):
-        return JuniperCliHandler(self.cli, self.context, self._logger, self.api)
+        return JuniperCliHandler(self.cli, self.resource_config, self._logger, self.api)
 
     @property
     def load_firmware_flow(self):

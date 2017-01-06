@@ -1,15 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import re
 import os
-
-# from cloudshell.networking.devices.autoload.networking_attributes import RootAttributes, ChassisAttributes, \
-#     PowerPortAttributes, \
-#     ModuleAttributes, SubModuleAttributes, PortAttributes, PortChannelAttributes
-from cloudshell.networking.devices.autoload.networking_model import RootElement, Chassis, Module, SubModule, Port, \
-    PowerPort, \
-    PortChannel
+import re
 
 from cloudshell.networking.devices.autoload.autoload_builder import AutoloadDetailsBuilder
 from cloudshell.networking.standards.networking.autoload_structure import *
@@ -141,7 +134,7 @@ class JuniperGenericPort(object):
         :return:
         """
         port = GenericPort(shell_name=self.shell_name,
-                           name=self.name,
+                           name=self.port_name,
                            unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port', self.index))
 
         port.port_description = self.port_description
@@ -163,9 +156,9 @@ class JuniperGenericPort(object):
         Build PortChannel instance using collected information
         :return:
         """
-
+        port_name = AddRemoveVlanHelper.convert_port_name(self.port_name)
         port_channel = GenericPortChannel(shell_name=self.shell_name,
-                                          name=self.name,
+                                          name=port_name,
                                           unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index))
 
         # port_channel = PortChannel(self.port_phis_id, self.name, unique_id=unique_id)
@@ -186,7 +179,6 @@ class JuniperSnmpAutoload(object):
     FILTER_PORTS_BY_DESCRIPTION = ['bme', 'vme', 'me', 'vlan', 'gr', 'vt', 'mt', 'mams', 'irb', 'lsi', 'tap', 'fxp']
     FILTER_PORTS_BY_TYPE = ['tunnel', 'other', 'pppMultilinkBundle', 'mplsTunnel', 'softwareLoopback']
 
-    # SUPPORTED_OS = [r'[Jj]uniper']
     SNMP_ERRORS = [r'No\s+Such\s+Object\s+currently\s+exists']
 
     def __init__(self, snmp_handler, shell_name, shell_type, resource_name, logger):
@@ -484,7 +476,7 @@ class JuniperSnmpAutoload(object):
 
         for index in self.if_indexes:
             index = int(index)
-            generic_port = JuniperGenericPort(index, self.snmp_handler, self._resource_name)
+            generic_port = JuniperGenericPort(index, self.snmp_handler, self.shell_name, self.shell_type, self._resource_name)
             if not self._port_filtered_by_name(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
                     self._physical_generic_ports[index] = generic_port
@@ -622,8 +614,8 @@ class JuniperSnmpAutoload(object):
                     # chassis.ports.append(generic_port.get_port())
 
     def _get_pic_by_index(self, fpc, index):
-        for pic in fpc.sub_modules:
-            if pic.element_id == index:
+        for element_id, pic in fpc.resources.get("SM", {}).iteritems():
+            if element_id == index:
                 return pic
         return None
 

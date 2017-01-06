@@ -6,7 +6,7 @@ from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHand
 
 
 class JuniperRunCommandRunner(RunCommandRunner):
-    def __init__(self, cli, context, logger, api):
+    def __init__(self, cli, resource_config, logger, api):
         """
         :param context: command context
         :param api: cloudshell api object
@@ -18,8 +18,8 @@ class JuniperRunCommandRunner(RunCommandRunner):
         super(JuniperRunCommandRunner, self).__init__(logger)
         self.cli = cli
         self.api = api
-        self.context = context
+        self.resource_config = resource_config
 
     @property
     def cli_handler(self):
-        return JuniperCliHandler(self.cli, self.context, self._logger, self.api)
+        return JuniperCliHandler(self.cli, self.resource_config, self._logger, self.api)

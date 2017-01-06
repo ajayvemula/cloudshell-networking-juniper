@@ -5,14 +5,14 @@ from cloudshell.networking.snmp_handler import SnmpHandler
 
 
 class JuniperSnmpHandler(SnmpHandler):
-    def __init__(self, cli, context, logger, api):
-        super(JuniperSnmpHandler, self).__init__(context, logger)
+    def __init__(self, cli, resource_config, logger, api):
+        super(JuniperSnmpHandler, self).__init__(resource_config, logger)
         self._cli = cli
         self._api = api
 
     @property
     def juniper_cli_handler(self):
-        return JuniperCliHandler(self._cli, self._context, self._logger, self._api)
+        return JuniperCliHandler(self._cli, self.resource_config, self._logger, self._api)
 
     def _create_enable_flow(self):
         return JuniperEnableSnmpFlow(self.juniper_cli_handler, self._logger)

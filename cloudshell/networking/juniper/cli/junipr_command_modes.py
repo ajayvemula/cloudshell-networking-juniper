@@ -2,8 +2,6 @@ from collections import OrderedDict
 
 from cloudshell.cli.command_mode import CommandMode
 from cloudshell.shell.core.api_utils import decrypt_password
-from cloudshell.shell.core.context_utils import get_attribute_by_name
-import cloudshell.networking.model.networking_standard_attributes as attributes
 
 
 class CliCommandMode(CommandMode):
@@ -11,8 +9,8 @@ class CliCommandMode(CommandMode):
     ENTER_COMMAND = ''
     EXIT_COMMAND = 'exit'
 
-    def __init__(self, context, api):
-        self._context = context
+    def __init__(self, resource_config, api):
+        self.resource_config = resource_config
         self._api = api
         CommandMode.__init__(self, CliCommandMode.PROMPT, CliCommandMode.ENTER_COMMAND,
                              CliCommandMode.EXIT_COMMAND, enter_action_map=self.enter_action_map(),
@@ -40,8 +38,8 @@ class DefaultCommandMode(CommandMode):
     ENTER_COMMAND = 'cli'
     EXIT_COMMAND = 'exit'
 
-    def __init__(self, context, api):
-        self._context = context
+    def __init__(self, resource_config, api):
+        self.resource_config = resource_config
         self._api = api
         CommandMode.__init__(self, DefaultCommandMode.PROMPT,
                              DefaultCommandMode.ENTER_COMMAND,
@@ -70,8 +68,8 @@ class ConfigCommandMode(CommandMode):
     ENTER_COMMAND = 'configure'
     EXIT_COMMAND = 'exit'
 
-    def __init__(self, context, api):
-        self._context = context
+    def __init__(self, resource_config, api):
+        self.resource_config = resource_config
         self._api = api
         CommandMode.__init__(self, ConfigCommandMode.PROMPT,
                              ConfigCommandMode.ENTER_COMMAND,
@@ -81,9 +79,7 @@ class ConfigCommandMode(CommandMode):
 
     def enter_action_map(self):
         return OrderedDict([(r'[Pp]assword', lambda session, logger: session.send_line(
-            decrypt_password(self._api,
-                             get_attribute_by_name(attributes.ENABLE_PASSWORD, self._context) or get_attribute_by_name(
-                                 attributes.PASSWORD, self._context))))])
+            decrypt_password(self._api, self.resource_config.enable_password or self.resource_config.password)))])
 
     def enter_error_map(self):
         return OrderedDict([(r'[Ee]rror:', 'Command error')])

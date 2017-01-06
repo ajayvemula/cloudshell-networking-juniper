@@ -8,7 +8,7 @@ from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHand
 
 
 class JuniperConnectivityRunner(ConnectivityRunner):
-    def __init__(self, cli, logger, api, context):
+    def __init__(self, cli, logger, api, resource_config):
         """
             Handle add/remove vlan flows
 
@@ -21,11 +21,11 @@ class JuniperConnectivityRunner(ConnectivityRunner):
         super(JuniperConnectivityRunner, self).__init__(logger)
         self.cli = cli
         self.api = api
-        self.context = context
+        self.resource_config = resource_config
 
     @property
     def cli_handler(self):
-        return JuniperCliHandler(self.cli, self.context, self._logger, self.api)
+        return JuniperCliHandler(self.cli, self.resource_config, self._logger, self.api)
 
     @property
     def remove_vlan_flow(self):

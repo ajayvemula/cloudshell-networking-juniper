@@ -7,15 +7,15 @@ from cloudshell.networking.juniper.snmp.juniper_snmp_handler import JuniperSnmpH
 
 
 class JuniperAutoloadRunner(AutoloadRunner):
-    def __init__(self, cli, logger, context, api, supported_os):
-        super(JuniperAutoloadRunner, self).__init__(context, supported_os)
+    def __init__(self, cli, logger, resource_config, api, supported_os):
+        super(JuniperAutoloadRunner, self).__init__(resource_config, supported_os)
         self._cli = cli
         self._api = api
         self._logger = logger
 
     @property
     def snmp_handler(self):
-        return JuniperSnmpHandler(self._cli, self._context, self._logger, self._api)
+        return JuniperSnmpHandler(self._cli, self.resource_config, self._logger, self._api)
 
     @property
     def autoload_flow(self):

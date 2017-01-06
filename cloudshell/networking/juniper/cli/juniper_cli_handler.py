@@ -5,9 +5,9 @@ from cloudshell.networking.juniper.cli.junipr_command_modes import DefaultComman
 
 
 class JuniperCliHandler(CliHandlerImpl):
-    def __init__(self, cli, context, logger, api):
-        super(JuniperCliHandler, self).__init__(cli, context, logger, api)
-        modes = CommandModeHelper.create_command_mode(context, api)
+    def __init__(self, cli, resource_config, logger, api):
+        super(JuniperCliHandler, self).__init__(cli, resource_config, logger, api)
+        modes = CommandModeHelper.create_command_mode(resource_config, api)
         self.enable_mode = modes[DefaultCommandMode]
         self.config_mode = modes[ConfigCommandMode]
 
