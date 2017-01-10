@@ -1,4 +1,4 @@
-from cloudshell.networking.devices.flows.snmp_action_flows import AutoloadFlow
+from cloudshell.devices.flows.snmp_action_flows import AutoloadFlow
 from cloudshell.networking.juniper.autoload.juniper_snmp_autoload import JuniperSnmpAutoload
 
 

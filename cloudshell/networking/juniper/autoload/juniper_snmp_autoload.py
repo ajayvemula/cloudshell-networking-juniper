@@ -4,8 +4,8 @@
 import os
 import re
 
-from cloudshell.networking.devices.autoload.autoload_builder import AutoloadDetailsBuilder
-from cloudshell.networking.standards.networking.autoload_structure import *
+from cloudshell.devices.autoload.autoload_builder import AutoloadDetailsBuilder
+from cloudshell.devices.standards.networking.autoload_structure import *
 
 from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemoveVlanHelper
 

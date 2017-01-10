@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.connectivity_runner import ConnectivityRunner
+from cloudshell.devices.runners.connectivity_runner import ConnectivityRunner
 from cloudshell.networking.juniper.flows.juniper_add_vlan_flow import JuniperAddVlanFlow
 from cloudshell.networking.juniper.flows.juniper_remove_vlan_flow import JuniperRemoveVlanFlow
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
@@ -9,15 +9,14 @@ from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHand
 
 class JuniperConnectivityRunner(ConnectivityRunner):
     def __init__(self, cli, logger, api, resource_config):
-        """
-            Handle add/remove vlan flows
+        """ Handle add/remove vlan flows
 
             :param cli:
             :param logger:
             :param api:
-            :param context:
-            :param supported_os:
+            :param resource_config:
             """
+
         super(JuniperConnectivityRunner, self).__init__(logger)
         self.cli = cli
         self.api = api

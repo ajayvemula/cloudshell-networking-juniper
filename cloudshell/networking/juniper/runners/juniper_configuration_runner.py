@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.configuration_runner import ConfigurationRunner
+from cloudshell.devices.runners.configuration_runner import ConfigurationRunner
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 from cloudshell.networking.juniper.flows.juniper_restore_flow import JuniperRestoreFlow
 from cloudshell.networking.juniper.flows.juniper_save_flow import JuniperSaveFlow

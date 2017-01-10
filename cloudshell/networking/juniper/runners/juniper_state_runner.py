@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.state_runner import StateRunner
+from cloudshell.devices.runners.state_runner import StateRunner
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 
 
@@ -11,7 +11,7 @@ class JuniperStateRunner(StateRunner):
         :param cli:
         :param logger:
         :param api:
-        :param context:
+        :param resource_config:
         """
 
         super(JuniperStateRunner, self).__init__(logger, api, resource_config)

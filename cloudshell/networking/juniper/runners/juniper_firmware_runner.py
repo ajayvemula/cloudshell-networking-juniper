@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.firmware_runner import FirmwareRunner
+from cloudshell.devices.runners.firmware_runner import FirmwareRunner
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 from cloudshell.networking.juniper.flows.juniper_firmware_flow import JuniperFirmwareFlow
 

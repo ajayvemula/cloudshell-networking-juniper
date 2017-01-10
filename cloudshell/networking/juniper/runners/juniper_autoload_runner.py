@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.autoload_runner import AutoloadRunner
+from cloudshell.devices.runners.autoload_runner import AutoloadRunner
 from cloudshell.networking.juniper.flows.juniper_autoload_flow import JuniperSnmpAutoloadFlow
 from cloudshell.networking.juniper.snmp.juniper_snmp_handler import JuniperSnmpHandler
 
 
 class JuniperAutoloadRunner(AutoloadRunner):
-    def __init__(self, cli, logger, resource_config, api, supported_os):
-        super(JuniperAutoloadRunner, self).__init__(resource_config, supported_os)
+    def __init__(self, cli, logger, resource_config, api):
+        super(JuniperAutoloadRunner, self).__init__(resource_config)
         self._cli = cli
         self._api = api
         self._logger = logger

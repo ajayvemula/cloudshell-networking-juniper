@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from cloudshell.networking.devices.runners.run_command_runner import RunCommandRunner
+from cloudshell.devices.runners.run_command_runner import RunCommandRunner
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 
 
 class JuniperRunCommandRunner(RunCommandRunner):
     def __init__(self, cli, resource_config, logger, api):
         """
-        :param context: command context
+        :param resource_config:
         :param api: cloudshell api object
         :param cli: CLI object
         :param logger: QsLogger object
