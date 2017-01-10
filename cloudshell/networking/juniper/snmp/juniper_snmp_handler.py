@@ -1,7 +1,7 @@
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 from cloudshell.networking.juniper.flows.juniper_disable_snmp_flow import JuniperDisableSnmpFlow
 from cloudshell.networking.juniper.flows.juniper_enable_snmp_flow import JuniperEnableSnmpFlow
-from cloudshell.networking.snmp_handler import SnmpHandler
+from cloudshell.devices.snmp_handler import SnmpHandler
 
 
 class JuniperSnmpHandler(SnmpHandler):
