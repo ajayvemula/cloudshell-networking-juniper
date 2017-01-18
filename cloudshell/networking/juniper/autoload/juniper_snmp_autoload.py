@@ -17,8 +17,6 @@ class JuniperGenericPort(object):
     Collect information and build Port or PortChannel
     """
     PORTCHANNEL_DESCRIPTIONS = ['ae']
-    PORT_NAME_CHAR_REPLACEMENT = {'/': '-'}
-
     AUTOLOAD_MAX_STRING_LENGTH = 100
 
     JUNIPER_IF_MIB = 'JUNIPER-IF-MIB'
@@ -55,7 +53,6 @@ class JuniperGenericPort(object):
         else:
             self.is_portchannel = False
 
-        self._port_name_char_replacement = self.PORT_NAME_CHAR_REPLACEMENT
         self._max_string_length = self.AUTOLOAD_MAX_STRING_LENGTH
 
     def _get_snmp_attribute(self, mib, snmp_attribute):
@@ -126,7 +123,7 @@ class JuniperGenericPort(object):
     def _get_port_autoneg(self):
         # auto_negotiation = self.snmp_handler.snmp_request(('MAU-MIB', 'ifMauAutoNegAdminStatus'))
         # return auto_negotiation
-        return None
+        return False
 
     def get_port(self):
         """
@@ -134,7 +131,7 @@ class JuniperGenericPort(object):
         :return:
         """
         port = GenericPort(shell_name=self.shell_name,
-                           name=self.port_name,
+                           name=AddRemoveVlanHelper.convert_port_name(self.port_name),
                            unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port', self.index))
 
         port.port_description = self.port_description
@@ -144,7 +141,6 @@ class JuniperGenericPort(object):
         port.bandwidth = self._get_snmp_attribute(self.IF_MIB, 'ifHighSpeed')
         port.ipv4_address = self._get_associated_ipv4_address()
         port.ipv6_address = self._get_associated_ipv6_address()
-        port.protocol_type = self._get_snmp_attribute(self.IF_MIB, 'protoType')
         port.duplex = self._get_port_duplex()
         port.auto_negotiation = self._get_port_autoneg()
         port.adjacent = self.port_adjacent
@@ -159,14 +155,13 @@ class JuniperGenericPort(object):
         port_name = AddRemoveVlanHelper.convert_port_name(self.port_name)
         port_channel = GenericPortChannel(shell_name=self.shell_name,
                                           name=port_name,
-                                          unique_id='{0}.{1}.{2}'.format(self._resource_name, 'port_channel', self.index))
-
-        # port_channel = PortChannel(self.port_phis_id, self.name, unique_id=unique_id)
+                                          unique_id='{0}.{1}.{2}'.format(self._resource_name,
+                                                                         'port_channel',
+                                                                         self.index))
 
         port_channel.port_description = self.port_description
         port_channel.ipv4_address = self._get_associated_ipv4_address()
         port_channel.ipv6_address = self._get_associated_ipv6_address()
-        port_channel.protocol_type = self._get_snmp_attribute(self.IF_MIB, 'protoType')
         port_channel.associated_ports = ','.join(self.associated_port_names)
 
         return port_channel
@@ -476,7 +471,11 @@ class JuniperSnmpAutoload(object):
 
         for index in self.if_indexes:
             index = int(index)
-            generic_port = JuniperGenericPort(index, self.snmp_handler, self.shell_name, self.shell_type, self._resource_name)
+            generic_port = JuniperGenericPort(index=index,
+                                              snmp_handler=self.snmp_handler,
+                                              shell_name=self.shell_name,
+                                              shell_type=self.shell_type,
+                                              resource_name=self._resource_name)
             if not self._port_filtered_by_name(generic_port) and not self._port_filtered_by_type(generic_port):
                 if generic_port.logical_unit == '0':
                     self._physical_generic_ports[index] = generic_port
@@ -593,29 +592,25 @@ class JuniperSnmpAutoload(object):
         for generic_port in self._physical_generic_ports.values():
             if generic_port.is_portchannel:
                 self.resource.add_sub_resource(generic_port.port_phis_id, generic_port.get_portchannel())
-                # self._root.port_channels.append(generic_port.get_portchannel())
             else:
                 port = generic_port.get_port()
                 if generic_port.fpc_id > 0 and generic_port.fpc_id in self._modules:
                     fpc = self._modules.get(generic_port.fpc_id)
-                    if fpc and generic_port.pic_id > 0:
-                        pic = self._get_pic_by_index(fpc, int(generic_port.pic_id))
+                    if fpc and int(generic_port.pic_id) > 0:
+                        pic = self._get_pic_by_index(fpc, int(generic_port.pic_id))[0]
                         if pic:
                             pic.add_sub_resource(generic_port.port_phis_id, port)
-                            # pic.ports.append(port)
                         else:
                             self.logger.info('Port {} is not allowed'.format(port.name))
                     else:
                         fpc.add_sub_resource(generic_port.port_phis_id, port)
-                        # fpc.ports.append(port)
                 else:
                     chassis = self._chassis.values()[0]
                     chassis.add_sub_resource(generic_port.port_phis_id, port)
-                    # chassis.ports.append(generic_port.get_port())
 
     def _get_pic_by_index(self, fpc, index):
         for element_id, pic in fpc.resources.get("SM", {}).iteritems():
-            if element_id == index:
+            if int(element_id) == index:
                 return pic
         return None
 
@@ -647,13 +642,13 @@ class JuniperSnmpAutoload(object):
         self.logger.debug('-------------------- <RESOURCES> ----------------------')
         for resource in autoload_details.resources:
             self.logger.debug(
-                '{0}, {1}, {2}'.format(resource.relative_address, resource.name, resource.unique_identifier))
+                '{0:15}, {1:20}, {2}'.format(resource.relative_address, resource.name, resource.unique_identifier))
         self.logger.debug('-------------------- </RESOURCES> ----------------------')
 
         self.logger.debug('-------------------- <ATTRIBUTES> ---------------------')
         for attribute in autoload_details.attributes:
-            self.logger.debug('-- {0}, {1}, {2}'.format(attribute.relative_address, attribute.attribute_name,
-                                                        attribute.attribute_value))
+            self.logger.debug('-- {0:15}, {1:60}, {2}'.format(attribute.relative_address, attribute.attribute_name,
+                                                              attribute.attribute_value))
         self.logger.debug('-------------------- </ATTRIBUTES> ---------------------')
 
     def discover(self, supported_os):
@@ -672,6 +667,5 @@ class JuniperSnmpAutoload(object):
         self._build_sub_modules()
         self._build_ports()
         autoload_details = AutoloadDetailsBuilder(self.resource).autoload_details()
-        # autoload_details = self._root.get_autoload_details()
         self._log_autoload_details(autoload_details)
         return autoload_details
