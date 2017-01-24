@@ -504,16 +504,20 @@ class JuniperSnmpAutoload(object):
         for port_index in snmp_data:
             port_index = int(port_index)
             if port_index in self._logical_generic_ports:
-                associated_phisical_port = self.get_associated_phisical_port_by_name(
+                associated_physical_port = self.get_associated_phisical_port_by_name(
                     self._logical_generic_ports[port_index].port_name)
-                logical_portchannel_index = snmp_data[port_index].get('dot3adAggPortAttachedAggID')
-                if logical_portchannel_index and int(logical_portchannel_index) in self._logical_generic_ports:
-                    associated_phisical_portchannel = self.get_associated_phisical_port_by_name(
-                        self._logical_generic_ports[int(logical_portchannel_index)].port_name)
-                    if associated_phisical_portchannel:
-                        associated_phisical_portchannel.is_portchannel = True
-                        if associated_phisical_port:
-                            associated_phisical_portchannel.associated_port_names.append(associated_phisical_port.name)
+                portchannel_index = snmp_data[port_index].get('dot3adAggPortAttachedAggID')
+                physical_portchannel = None
+                if portchannel_index and int(portchannel_index) in self._logical_generic_ports:
+                    physical_portchannel = self.get_associated_phisical_port_by_name(
+                        self._logical_generic_ports[int(portchannel_index)].port_name)
+                elif portchannel_index and int(portchannel_index) in self._physical_generic_ports:
+                    physical_portchannel = self._physical_generic_ports[int(portchannel_index)]
+
+                if physical_portchannel:
+                    physical_portchannel.is_portchannel = True
+                    if associated_physical_port:
+                        physical_portchannel.associated_port_names.append(associated_physical_port.port_name)
 
     def _associate_adjacent(self):
         for index in self.lldp_keys:

@@ -7,7 +7,7 @@ from cloudshell.networking.juniper.helpers.add_remove_vlan_helper import AddRemo
 
 class JuniperRemoveVlanFlow(RemoveVlanFlow):
     def execute_flow(self, vlan_range, port_name, port_mode, action_map=None, error_map=None):
-        port = AddRemoveVlanHelper.extract_port_name(port_name, self._logger)
+        port = AddRemoveVlanHelper.extract_port_name(port_name)
         vlan_name = "vlan-" + vlan_range
         with self._cli_handler.get_cli_service(self._cli_handler.config_mode) as cli_service:
             commit_rollback_actions = CommitRollbackActions(cli_service, self._logger)
