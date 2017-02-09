@@ -77,13 +77,17 @@ class GenericPort(object):
     @property
     def fpc_id(self):
         if not self._fpc_id:
-            self._fpc_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisFpc')
+            fpc_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisFpc')
+            if fpc_id:
+                self._fpc_id = int(fpc_id)
         return self._fpc_id
 
     @property
     def pic_id(self):
         if not self._pic_id:
-            self._pic_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPic')
+            pic_id = self._get_snmp_attribute(self.JUNIPER_IF_MIB, 'ifChassisPic')
+            if pic_id:
+                self._pic_id = int(pic_id)
         return self._pic_id
 
     @property
@@ -186,7 +190,7 @@ class JuniperSnmpAutoload(object):
         self._generic_physical_ports_by_name = None
         self._generic_logical_ports_by_name = None
         self._ports = {}
-        self.sub_modules = {}
+        self._sub_modules = {}
         self._modules = {}
         self._chassis = {}
         self._root = RootElement(unique_id=self._resource_name)
@@ -338,7 +342,7 @@ class JuniperSnmpAutoload(object):
                 index1, index2, index3, index4 = index.split('.')[:4]
                 chassis_id = index2
                 unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'chassis', index)
-                chassis = Chassis(chassis_id, unique_id=unique_id)
+                chassis = Chassis(int(chassis_id) - 1, unique_id=unique_id)
 
                 chassis_attributes = dict()
                 chassis_attributes[ChassisAttributes.MODEL] = self._get_element_model(content_data)
@@ -366,7 +370,7 @@ class JuniperSnmpAutoload(object):
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
                 unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'power_port', index)
-                element = PowerPort(element_id, unique_id=unique_id)
+                element = PowerPort(int(element_id) - 1, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[PowerPortAttributes.MODEL] = self._get_element_model(content_data)
@@ -399,7 +403,7 @@ class JuniperSnmpAutoload(object):
                 index1, index2, index3, index4 = index.split('.')[:4]
                 element_id = index2
                 unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'module', index)
-                element = Module(element_id, unique_id=unique_id)
+                element = Module(int(element_id) - 1, unique_id=unique_id)
 
                 element_attributes = dict()
                 element_attributes[ModuleAttributes.MODEL] = self._get_element_model(content_data)
@@ -411,7 +415,7 @@ class JuniperSnmpAutoload(object):
                     chassis = self._chassis.get(chassis_id_str.strip('\''))
                     if chassis:
                         chassis.modules.append(element)
-                        self._modules[element_id] = element
+                        self._modules[str(element_id)] = element
 
     def _build_sub_modules(self):
         """
@@ -430,10 +434,10 @@ class JuniperSnmpAutoload(object):
                 content_data = self.snmp_handler.get_properties('JUNIPER-MIB', index,
                                                                 sub_modules_snmp_attributes).get(index)
                 index1, index2, index3, index4 = index.split('.')[:4]
-                parent_id = index2
+                parent_id = str(index2)
                 element_id = index3
                 unique_id = '{0}.{1}.{2}'.format(self._resource_name, 'sub_module', index)
-                element = SubModule(element_id, unique_id=unique_id)
+                element = SubModule(int(element_id) - 1, unique_id=unique_id)
                 element_attributes = dict()
                 element_attributes[SubModuleAttributes.MODEL] = self._get_element_model(content_data)
                 element_attributes[SubModuleAttributes.SERIAL_NUMBER] = content_data.get('jnxContentsSerialNo')
@@ -441,7 +445,7 @@ class JuniperSnmpAutoload(object):
                 element.build_attributes(element_attributes)
                 if parent_id in self._modules:
                     self._modules[parent_id].sub_modules.append(element)
-                    self.sub_modules[element_id] = element
+                    self._modules['{0}.{1}'.format(parent_id, element_id)] = element
 
     @staticmethod
     def _get_element_model(content_data):
@@ -582,25 +586,20 @@ class JuniperSnmpAutoload(object):
                 self._root.port_channels.append(generic_port.get_portchannel())
             else:
                 port = generic_port.get_port()
-                if generic_port.fpc_id > 0 and generic_port.fpc_id in self._modules:
-                    fpc = self._modules.get(generic_port.fpc_id)
-                    if fpc and generic_port.pic_id > 0:
-                        pic = self._get_pic_by_index(fpc, int(generic_port.pic_id))
-                        if pic:
-                            pic.ports.append(port)
-                        else:
-                            self.logger.info('Port {} is not allowed'.format(port.name))
-                    else:
-                        fpc.ports.append(port)
-                else:
-                    chassis = self._chassis.values()[0]
-                    chassis.ports.append(generic_port.get_port())
+                parent_id = '{0}.{1}'.format(generic_port.fpc_id, generic_port.pic_id)
+                parent = self._modules.get(parent_id)
+                if parent:
+                    parent.ports.append(port)
+                    continue
 
-    def _get_pic_by_index(self, fpc, index):
-        for pic in fpc.sub_modules:
-            if pic.element_id == index:
-                return pic
-        return None
+                parent_id = str(generic_port.fpc_id)
+                parent = self._modules.get(parent_id)
+                if parent:
+                    parent.ports.append(port)
+                    continue
+
+                chassis = self._chassis.values()[0]
+                chassis.ports.append(generic_port.get_port())
 
     def _is_valid_device_os(self, supported_os):
         """Validate device OS using snmp
