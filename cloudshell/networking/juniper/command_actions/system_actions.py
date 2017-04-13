@@ -15,12 +15,12 @@ class SystemActions(object):
         self._cli_service = cli_service
         self._logger = logger
 
-    def reboot(self):
+    def reboot(self, timeout=None):
         """
         Reboot the system
         :return:
         """
-        output = CommandTemplateExecutor(self._cli_service, system_commands.REBOOT).execute_command()
+        output = CommandTemplateExecutor(self._cli_service, system_commands.REBOOT, timeout=timeout).execute_command()
         return output
 
     def shutdown(self):

@@ -26,10 +26,8 @@ class AddRemoveVlanActions(object):
         """
         output = CommandTemplateExecutor(self._cli_service, command_template.SHOW_VLAN_INTERFACES).execute_command(
             vlan_name=vlan_name)
-        ports = re.findall(r'\w+-(?:\d+/)+\d+|ae\d+', re.sub(r'\n|\r', '', output))
-        if ports:
-            return [port.strip() for port in ports]
-        return []
+        ports = re.findall(r'[a-zA-Z]+-(?:\d+/)+\d+|ae\d+', re.sub(r'\n|\r', '', output))
+        return [port.strip() for port in set(ports)]
 
     def create_qnq_vlan(self, vlan_name, vlan_range):
         """

@@ -23,5 +23,5 @@ DELETE_VLAN = CommandTemplate('delete vlans {vlan_name}', error_map=ERROR_MAP)
 
 CREATE_VLAN_RANGE = CommandTemplate('set vlans {vlan_name} vlan-range {vlan_range}', error_map=ERROR_MAP)
 
-SHOW_VLAN_INTERFACES = CommandTemplate('show vlans {vlan_name}', error_map=ERROR_MAP)
+SHOW_VLAN_INTERFACES = CommandTemplate('run show vlans {vlan_name}', error_map=ERROR_MAP)
 SHOW_INTERFACE = CommandTemplate('show interfaces {port_name}', error_map=ERROR_MAP)
