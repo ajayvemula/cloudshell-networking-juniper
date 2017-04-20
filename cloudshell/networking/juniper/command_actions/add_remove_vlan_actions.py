@@ -75,7 +75,7 @@ class AddRemoveVlanActions(object):
                 vlan_name=vlan_name)
         return output
 
-    def assign_member(self, port, vlan_name, mode):
+    def assign_member(self, port, vlan_range, mode):
         """
         Assign interface to the vlan members
         :param port:
@@ -85,11 +85,11 @@ class AddRemoveVlanActions(object):
         """
         output = CommandTemplateExecutor(self._cli_service, command_template.ASSIGN_VLAN_MEMBER).execute_command(
             port=port,
-            vlan_name=vlan_name,
+            vlan_range=vlan_range,
             mode=mode)
         return output
 
-    def delete_member(self, port, vlan_name):
+    def delete_member(self, port, vlan_range):
         """
         Delete interface from vlan members
         :param port:
@@ -98,7 +98,7 @@ class AddRemoveVlanActions(object):
         """
         output = CommandTemplateExecutor(self._cli_service, command_template.DELETE_VLAN_MEMBER).execute_command(
             port=port,
-            vlan_name=vlan_name)
+            vlan_range=vlan_range)
         return output
 
     def get_vlans_for_port(self, port):
@@ -133,3 +133,30 @@ class AddRemoveVlanActions(object):
             self.delete_member(port, vlan_name)
         self.remove_port_mode_on_interface(port)
         self._logger.info("Cleaning port {0}, vlans, {1}".format(port, ", ".join(vlans)))
+
+    def get_vlans(self):
+        """
+        Get vlans info
+        :return: 
+        """
+        vlan_dict = {}
+        out = CommandTemplateExecutor(self._cli_service, command_template.SHOW_VLANS).execute_command()
+        pattern = '(?P<vlan_name>.+)\s+{\s+vlan-(id|range)\s+(?P<vlan_id>\d+(-\d+)?);'
+        iterator = re.finditer(pattern, out, flags=re.MULTILINE | re.IGNORECASE)
+        for match in iterator:
+            match_dict = match.groupdict()
+            vlan_dict[match_dict['vlan_name'].strip()] = match_dict['vlan_id'].strip()
+        return vlan_dict
+
+    def check_vlan_qnq(self, vlan_name):
+        """
+        Check if vlan qnq 
+        :param vlan_name: 
+        :return: 
+        """
+        pattern = r'dot1q-tunneling;'
+        out = CommandTemplateExecutor(self._cli_service, command_template.SHOW_SPECIFIC_VLAN).execute_command(vlan_name=vlan_name)
+        if re.search(pattern, out, flags=re.MULTILINE | re.IGNORECASE):
+            return True
+        else:
+            return False
