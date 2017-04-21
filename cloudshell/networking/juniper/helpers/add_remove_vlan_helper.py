@@ -49,6 +49,8 @@ class VlanRange(object):
         """
         self.first_element = int(vlan_range[0])
         self.last_element = int(vlan_range[1])
+        if self.first_element > self.last_element:
+            raise Exception(self.__class__.__name__, 'Incorrect range')
         if name:
             self.name = name
         else:
@@ -119,6 +121,9 @@ class VlanRange(object):
 
     def __repr__(self):
         return self.to_string()
+
+    def __eq__(self, other):
+        return self.first_element == other.first_element and self.last_element == other.last_element
 
 
 class VlanRangeOperations(object):
