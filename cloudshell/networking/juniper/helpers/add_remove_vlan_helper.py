@@ -61,7 +61,7 @@ class VlanRange(object):
         Check for intersection
         :param other:
         :type other: VlanRange
-        :return: 
+        :return:
         """
         return self.first_element <= other.first_element <= self.last_element or self.first_element <= other.last_element <= self.last_element
 
@@ -100,8 +100,8 @@ class VlanRange(object):
     def range_from_string(range_str):
         """
         Range from string
-        :param range_str: 
-        :return: 
+        :param range_str:
+        :return:
         """
         _range = range_str.split('-')
         if 1 <= len(_range) <= 2:
@@ -112,7 +112,7 @@ class VlanRange(object):
     def to_string(self):
         """
         Range to string
-        :return: 
+        :return:
         """
         return '{0}-{1}'.format(self.first_element, self.last_element)
 
@@ -131,8 +131,8 @@ class VlanRangeOperations(object):
     def create_from_dict(range_dict):
         """
         Create list of ranges from dict
-        :param range_dict: 
-        :return: 
+        :param range_dict:
+        :return:
         """
         range_list = []
         for name, vlan_range in range_dict.iteritems():
@@ -143,8 +143,8 @@ class VlanRangeOperations(object):
     def cutoff_intersection(target_list, source_list):
         """
         Cut intersection
-        :param target_list: 
-        :param source_list: 
+        :param target_list:
+        :param source_list:
         :return:
         :rtype: list
         """
@@ -159,9 +159,9 @@ class VlanRangeOperations(object):
     def find_intersection(target_list, source_list):
         """
         Find ranges from source which are intersecting with target ranges
-        :param target_list: 
-        :param source_list: 
-        :return: 
+        :param target_list:
+        :param source_list:
+        :return:
         """
         intersection_list = []
         for source_range in source_list:

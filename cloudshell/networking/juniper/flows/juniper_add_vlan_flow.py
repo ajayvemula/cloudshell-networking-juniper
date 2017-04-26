@@ -1,5 +1,5 @@
 from cloudshell.cli.session.session_exceptions import CommandExecutionException
-from cloudshell.networking.devices.flows.cli_action_flows import AddVlanFlow
+from cloudshell.devices.flows.cli_action_flows import AddVlanFlow
 from cloudshell.networking.juniper.cli.juniper_cli_handler import JuniperCliHandler
 from cloudshell.networking.juniper.command_actions.add_remove_vlan_actions import AddRemoveVlanActions
 from cloudshell.networking.juniper.command_actions.commit_rollback_actions import CommitRollbackActions

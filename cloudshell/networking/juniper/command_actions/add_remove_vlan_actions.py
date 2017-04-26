@@ -137,7 +137,7 @@ class AddRemoveVlanActions(object):
     def get_vlans(self):
         """
         Get vlans info
-        :return: 
+        :return:
         """
         vlan_dict = {}
         out = CommandTemplateExecutor(self._cli_service, command_template.SHOW_VLANS).execute_command()
@@ -150,9 +150,9 @@ class AddRemoveVlanActions(object):
 
     def check_vlan_qnq(self, vlan_name):
         """
-        Check if vlan qnq 
-        :param vlan_name: 
-        :return: 
+        Check if vlan qnq
+        :param vlan_name:
+        :return:
         """
         pattern = r'dot1q-tunneling;'
         out = CommandTemplateExecutor(self._cli_service, command_template.SHOW_SPECIFIC_VLAN).execute_command(vlan_name=vlan_name)
