@@ -1,5 +1,5 @@
 # cloudshell-networking-juniper
-![alt tag](https://travis-ci.org/QualiSystems/cloudshell-networking-juniper.svg)
+[![Build status](https://travis-ci.org/QualiSystems/cloudshell-networking-juniper.svg?branch=dev)](https://travis-ci.org/QualiSystems/cloudshell-networking-juniper)
 [![Coverage Status](https://coveralls.io/repos/github/QualiSystems/cloudshell-networking-juniper/badge.svg)](https://coveralls.io/github/QualiSystems/cloudshell-networking-juniper)
 [![PyPI version](https://badge.fury.io/py/cloudshell-networking-juniper.svg)](https://badge.fury.io/py/cloudshell-networking-juniper)
 [![Dependency Status](https://dependencyci.com/github/QualiSystems/cloudshell-networking-juniper/badge)](https://dependencyci.com/github/QualiSystems/cloudshell-networking-juniper)
