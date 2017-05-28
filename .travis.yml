@@ -8,6 +8,7 @@ install:
       else
         pip install --extra-index-url https://testpypi.python.org/pypi -r dev_requirements.txt;
       fi'
+    - python setup.py install
     - pip install -r test_requirements.txt
     - pip install coveralls
 
