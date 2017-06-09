@@ -289,8 +289,7 @@ class JuniperSnmpAutoload(object):
         model = ''
         os_version = ''
         sys_obj_id = self.snmp_handler.get_property('SNMPv2-MIB', 'sysObjectID', 0)
-        model_search = re.search('^(?P<vendor>\w+)-\S+jnxProductName(?P<model>\S+)', sys_obj_id
-                                 )
+        model_search = re.search('^(?P<vendor>\w+)-\S+jnxProductName(?P<model>\S+)', sys_obj_id)
         if model_search:
             vendor = model_search.groupdict()['vendor'].capitalize()
             model = model_search.groupdict()['model']
