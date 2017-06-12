@@ -159,6 +159,38 @@ class TestJuniperSnmpAutoload(TestCase):
                  call('SNMPv2-MIB', 'sysLocation', '0')]
         self._snmp_handler.get_property.assert_has_calls(calls)
 
+    def test_get_content_indexes(self):
+        index1 = 1
+        index2 = 2
+        index3 = 3
+        index4 = 4
+        value1 = {'jnxContentsContainerIndex': 4}
+        value2 = {'jnxContentsContainerIndex': 5}
+        value3 = {'jnxContentsContainerIndex': 6}
+        value4 = {'jnxContentsContainerIndex': 6}
+        container_indexes = {index1: value1, index2: value2, index3: value3, index4: value4}
+        self._snmp_handler.walk.return_value = container_indexes
+        self.assertEqual(self._autoload_operations_instance._get_content_indexes(), {4: [1], 5: [2], 6: [3, 4]})
+        self._snmp_handler.walk.assert_called_once_with(('JUNIPER-MIB', 'jnxContentsContainerIndex'))
+
+    def test_content_indexes_prop(self):
+        value = Mock()
+        self._autoload_operations_instance._get_content_indexes = Mock()
+        self._autoload_operations_instance._get_content_indexes.return_value = value
+        self.assertIs(self._autoload_operations_instance.content_indexes, value)
+        self.assertIs(self._autoload_operations_instance.content_indexes, value)
+        self._autoload_operations_instance._get_content_indexes.assert_called_once_with()
+
+    def test_if_indexes(self):
+        result = Mock()
+        value = Mock()
+        value.keys.return_value = result
+        self._snmp_handler.walk.return_value = value
+        self.assertIs(self._autoload_operations_instance.if_indexes, result)
+        self.assertIs(self._autoload_operations_instance.if_indexes, result)
+        self._snmp_handler.walk.assert_called_once_with(('JUNIPER-IF-MIB', 'ifChassisPort'))
+        value.keys.assert_called_once_with()
+
     @patch('cloudshell.networking.juniper.autoload.juniper_snmp_autoload.AutoloadDetailsBuilder')
     def test_discover(self, autoload_details_builder_class):
         autoload_details_builder = Mock()
