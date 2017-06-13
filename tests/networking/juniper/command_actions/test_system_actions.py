@@ -40,7 +40,7 @@ class TestSystemActions(TestCase):
 
     @patch('cloudshell.networking.juniper.command_actions.system_actions.command_template')
     @patch('cloudshell.networking.juniper.command_actions.system_actions.CommandTemplateExecutor')
-    def test_shutdown(self, command_template_executor, command_template):
+    def test_load_firmware(self, command_template_executor, command_template):
         output = Mock()
         execute_command = Mock()
         command_template_executor.return_value = execute_command
