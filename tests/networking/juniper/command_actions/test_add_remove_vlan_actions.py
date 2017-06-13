@@ -11,6 +11,10 @@ class TestAddRemoveVlanActions(TestCase):
         self._logger = Mock()
         self._instance = AddRemoveVlanActions(self._cli_service, self._logger)
 
+    def test_init(self):
+        self.assertIs(self._instance._cli_service, self._cli_service)
+        self.assertIs(self._instance._logger, self._logger)
+
     @patch('cloudshell.networking.juniper.command_actions.add_remove_vlan_actions.re')
     @patch('cloudshell.networking.juniper.command_actions.add_remove_vlan_actions.command_template')
     @patch('cloudshell.networking.juniper.command_actions.add_remove_vlan_actions.CommandTemplateExecutor')
