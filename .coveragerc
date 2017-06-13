@@ -1,0 +1,4 @@
+[report]
+omit =
+    */mibs/*
+    *__init__*
